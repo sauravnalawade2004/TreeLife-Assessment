@@ -1,0 +1,262 @@
+[
+  {
+    "dealTitle": "abc jun wala",
+    "fields": {
+      "Legacy": "G-M",
+      "Bucket 2": "AA",
+      "Ref": "27AB-JUN",
+      "Misc": "f2 old drv",
+      "Cycle": "06/26",
+      "Desk": "T1",
+      "Old Flag": "n",
+      "Trace": "mail"
+    }
+  },
+  {
+    "dealTitle": "ABC IT old copy",
+    "fields": {
+      "Legacy": "grm",
+      "Bucket 2": "",
+      "Ref": "27AB-JUN",
+      "Misc": "same as first; don't use",
+      "Cycle": "Jun26",
+      "Desk": "old",
+      "Old Flag": "y",
+      "Trace": "copy"
+    }
+  },
+  {
+    "dealTitle": "cedar rtn",
+    "fields": {
+      "Legacy": "KS",
+      "Bucket 2": "AA",
+      "Ref": "CDR-06",
+      "Misc": "final",
+      "Cycle": "Jun26",
+      "Desk": "T1",
+      "Old Flag": "n",
+      "Trace": "call"
+    }
+  },
+  {
+    "dealTitle": "nova return work",
+    "fields": {
+      "Legacy": "karan",
+      "Bucket 2": "Q7",
+      "Ref": "NV-29871",
+      "Misc": "wrong-folder",
+      "Cycle": "05-2026",
+      "Desk": "T2",
+      "Old Flag": "n",
+      "Trace": "arn"
+    }
+  },
+  {
+    "dealTitle": "MHT old matter",
+    "fields": {
+      "Legacy": "G.S",
+      "Bucket 2": "Z9",
+      "Ref": "MHT-0426",
+      "Misc": "dead folder",
+      "Cycle": "Apr 26",
+      "Desk": "old",
+      "Old Flag": "y",
+      "Trace": "paper"
+    }
+  },
+  {
+    "dealTitle": "orion tax",
+    "fields": {
+      "Legacy": "RN",
+      "Bucket 2": "CX",
+      "Ref": "ORI-0626",
+      "Misc": "stop-mail",
+      "Cycle": "06-26",
+      "Desk": "T2",
+      "Old Flag": "n",
+      "Trace": "cancel"
+    }
+  },
+  {
+    "dealTitle": "aster annual",
+    "fields": {
+      "Legacy": "gari",
+      "Bucket 2": "PD",
+      "Ref": "AST-0726",
+      "Misc": "bank stm",
+      "Cycle": "Jul/26",
+      "Desk": "T1",
+      "Old Flag": "n",
+      "Trace": "wa"
+    }
+  },
+  {
+    "dealTitle": "BP comp",
+    "fields": {
+      "Legacy": "riya",
+      "Bucket 2": "AA",
+      "Ref": "BP-0526",
+      "Misc": "mail doc",
+      "Cycle": "May-26",
+      "Desk": "T2",
+      "Old Flag": "n",
+      "Trace": "mail"
+    }
+  },
+  {
+    "dealTitle": "sun tax",
+    "fields": {
+      "Legacy": "GM",
+      "Bucket 2": "AA",
+      "Ref": "SUN-0626",
+      "Misc": "maybe final",
+      "Cycle": "0626",
+      "Desk": "T1",
+      "Old Flag": "n",
+      "Trace": "team"
+    }
+  },
+  {
+    "dealTitle": "alpha monthly",
+    "fields": {
+      "Legacy": "grm",
+      "Bucket 2": "AA",
+      "Ref": "GST-AL-0626",
+      "Misc": "misc 3b",
+      "Cycle": "Jun-26",
+      "Desk": "G1",
+      "Old Flag": "n",
+      "Trace": "gst"
+    }
+  },
+  {
+    "dealTitle": "beta compliance",
+    "fields": {
+      "Legacy": "KS",
+      "Bucket 2": "AA",
+      "Ref": "GST-BE-0626",
+      "Misc": "final gst",
+      "Cycle": "06/26",
+      "Desk": "G1",
+      "Old Flag": "n",
+      "Trace": "otp"
+    }
+  },
+  {
+    "dealTitle": "gamma gst",
+    "fields": {
+      "Legacy": "Ria",
+      "Bucket 2": "Q7",
+      "Ref": "GST-GA-0526",
+      "Misc": "55GA",
+      "Cycle": "May26",
+      "Desk": "G2",
+      "Old Flag": "n",
+      "Trace": "arn"
+    }
+  },
+  {
+    "dealTitle": "delta gst june",
+    "fields": {
+      "Legacy": "GM",
+      "Bucket 2": "CX",
+      "Ref": "GST-DH-0626",
+      "Misc": "stop",
+      "Cycle": "June",
+      "Desk": "G2",
+      "Old Flag": "n",
+      "Trace": "call"
+    }
+  },
+  {
+    "dealTitle": "q1 challan stuff",
+    "fields": {
+      "Legacy": "G-M",
+      "Bucket 2": "AA",
+      "Ref": "TDS-DL-Q1",
+      "Misc": "26q",
+      "Cycle": "Q1FY26",
+      "Desk": "D1",
+      "Old Flag": "n",
+      "Trace": "portal"
+    }
+  },
+  {
+    "dealTitle": "echo q1",
+    "fields": {
+      "Legacy": "KS",
+      "Bucket 2": "AA",
+      "Ref": "TDS-EC-Q1",
+      "Misc": "final q1",
+      "Cycle": "Apr-Jun",
+      "Desk": "D1",
+      "Old Flag": "n",
+      "Trace": "draft"
+    }
+  },
+  {
+    "dealTitle": "zeta CFA",
+    "fields": {
+      "Legacy": "CS1",
+      "Bucket 2": "PD",
+      "Ref": "CFA-Z-26",
+      "Misc": "dir kyc",
+      "Cycle": "FY26",
+      "Desk": "C1",
+      "Old Flag": "n",
+      "Trace": "mca"
+    }
+  },
+  {
+    "dealTitle": "eta cfa thing",
+    "fields": {
+      "Legacy": "CS1",
+      "Bucket 2": "AA",
+      "Ref": "CFA-E-26",
+      "Misc": "srn mca",
+      "Cycle": "FY26",
+      "Desk": "C1",
+      "Old Flag": "n",
+      "Trace": "mca"
+    }
+  },
+  {
+    "dealTitle": "agreement redline",
+    "fields": {
+      "Legacy": "G-M",
+      "Bucket 2": "Q7",
+      "Ref": "CTR-HZ-01",
+      "Misc": "legal/temp",
+      "Cycle": "Jul26",
+      "Desk": "L1",
+      "Old Flag": "n",
+      "Trace": "sign"
+    }
+  },
+  {
+    "dealTitle": "office stock jul",
+    "fields": {
+      "Legacy": "ADM",
+      "Bucket 2": "Q7",
+      "Ref": "INV-JUL",
+      "Misc": "stock latest",
+      "Cycle": "Jul26",
+      "Desk": "OPS",
+      "Old Flag": "n",
+      "Trace": "sheet"
+    }
+  },
+  {
+    "dealTitle": "kite itr 25-26",
+    "fields": {
+      "Legacy": "garma",
+      "Bucket 2": "AA",
+      "Ref": "KTE-AY26",
+      "Misc": "scan",
+      "Cycle": "AY25-26",
+      "Desk": "T1",
+      "Old Flag": "n",
+      "Trace": "scan"
+    }
+  }
+]

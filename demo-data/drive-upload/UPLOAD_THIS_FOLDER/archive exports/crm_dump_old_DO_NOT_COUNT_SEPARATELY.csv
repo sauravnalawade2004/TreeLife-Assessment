@@ -1,0 +1,8 @@
+Organization Name,Deal Title,Deal Status,Deal Value,Currency,Legacy,Bucket 2,Ref,Misc,Cycle,Desk,Old Flag,Trace,Note Content
+ABC Private Limited,abc jun wala,Open,18500,INR,G-M,AA,27AB-JUN,f2 old drv,06/26,T1,n,mail,grm ne 18/7 ko kar diya; ack mail me 89123
+ABC Pvt Ltd,ABC IT old copy,Open,0,INR,grm,,27AB-JUN,same as first; don't use,Jun26,old,y,copy,duplicate from old list; main row abc jun wala
+Cedar Works,cedar rtn,Won,12000,INR,KS,AA,CDR-06,final,Jun26,T1,n,call,status galat; abhi file nahi hua; client OTP pending
+Nova Retail,nova return work,Open,15000,INR,karan,Q7,NV-29871,wrong-folder,05-2026,T2,n,arn,arn 29871 aa gaya; client calls it IT work
+Mehta Traders,MHT old matter,Lost,9000,INR,G.S,Z9,MHT-0426,dead folder,Apr 26,old,y,paper,lost means old client only; itr filed; ack old folder me
+Orion Foods,orion tax,Lost,11000,INR,RN,CX,ORI-0626,stop-mail,06-26,T2,n,cancel,client said stop; no filing; do not count
+Aster Labs,aster annual,Open,13000,INR,gari,PD,AST-0726,bank stm,Jul/26,T1,n,wa,bank statement pending; not ready

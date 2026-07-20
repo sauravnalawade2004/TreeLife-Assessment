@@ -1,0 +1,21 @@
+Organization Name,Deal Title,Deal Status,Deal Value,Currency,Legacy,Bucket 2,Ref,Misc,Cycle,Desk,Old Flag,Trace,Note Content
+ABC Private Limited,abc jun wala,Open,18500,INR,G-M,AA,27AB-JUN,f2 old drv,06/26,T1,n,mail,grm ne 18/7 ko kar diya; ack mail me 89123
+ABC Pvt Ltd,ABC IT old copy,Open,0,INR,grm,,27AB-JUN,same as first; don't use,Jun26,old,y,copy,duplicate from old list; main row abc jun wala
+Cedar Works,cedar rtn,Won,12000,INR,KS,AA,CDR-06,final,Jun26,T1,n,call,status galat; abhi file nahi hua; client OTP pending
+Nova Retail,nova return work,Open,15000,INR,karan,Q7,NV-29871,wrong-folder,05-2026,T2,n,arn,arn 29871 aa gaya; client calls it IT work
+Mehta Traders,MHT old matter,Lost,9000,INR,G.S,Z9,MHT-0426,dead folder,Apr 26,old,y,paper,lost means old client only; itr filed; ack old folder me
+Orion Foods,orion tax,Lost,11000,INR,RN,CX,ORI-0626,stop-mail,06-26,T2,n,cancel,client said stop; no filing; do not count
+Aster Labs,aster annual,Open,13000,INR,gari,PD,AST-0726,bank stm,Jul/26,T1,n,wa,bank statement pending; not ready
+BluePeak Services,BP comp,Open,14500,INR,riya,AA,BP-0526,mail doc,May-26,T2,n,mail,done 26 may; receipt in mail dump
+Sunbird Hospitality,sun tax,Won,16000,INR,GM,AA,SUN-0626,maybe final,0626,T1,n,team,team says filed but arn not found anywhere
+Alpha Manufacturing,alpha monthly,Open,7000,INR,grm,AA,GST-AL-0626,misc 3b,Jun-26,G1,n,gst,3B done; ack in misc; official status not changed
+Beta Logistics,beta compliance,Won,7200,INR,KS,AA,GST-BE-0626,final gst,06/26,G1,n,otp,won auto set; otp pending; file not submitted
+Gamma Ventures,gamma gst,Open,6800,INR,Ria,Q7,GST-GA-0526,55GA,May26,G2,n,arn,ARN 55GA confirmed in weird folder
+Delta Hardware,delta gst june,Lost,6500,INR,GM,CX,GST-DH-0626,stop,June,G2,n,call,cancelled by client; no return filed
+Delta Consulting,q1 challan stuff,Open,8500,INR,G-M,AA,TDS-DL-Q1,26q,Q1FY26,D1,n,portal,26Q upload ok; token 7711
+Echo Media,echo q1,Won,8400,INR,KS,AA,TDS-EC-Q1,final q1,Apr-Jun,D1,n,draft,DRAFT only do not submit; salary correction pending
+Zeta Bio,zeta CFA,Open,22000,INR,CS1,PD,CFA-Z-26,dir kyc,FY26,C1,n,mca,dir kyc missing; cfa stays open
+Eta Mobility,eta cfa thing,Open,24000,INR,CS1,AA,CFA-E-26,srn mca,FY26,C1,n,mca,SRN received in MCA; board still not moved
+Horizon Textiles,agreement redline,Open,30000,INR,G-M,Q7,CTR-HZ-01,legal/temp,Jul26,L1,n,sign,client accepted; signed copy drive legal/temp
+Internal Operations,office stock jul,Open,0,INR,ADM,Q7,INV-JUL,stock latest,Jul26,OPS,n,sheet,latest sheet maybe ops drive; laptop 11 with Amit
+Kite Exports,kite itr 25-26,Open,12500,INR,garma,AA,KTE-AY26,scan,AY25-26,T1,n,scan,signed json uploaded; filing receipt says submitted by G Sharma

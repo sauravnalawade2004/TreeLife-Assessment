@@ -1,0 +1,182 @@
+{
+  "warning": "TEST-ONLY. Do not upload this folder to Pipedrive or Google Drive.",
+  "canonicalItems": [
+    {
+      "id": "ITR-ABC-0626",
+      "type": "income_tax_filing",
+      "client": "ABC Private Limited",
+      "owner": "Garima Sharma",
+      "state": "completed",
+      "duplicateDealTitles": [
+        "abc jun wala",
+        "ABC IT old copy"
+      ],
+      "proof": "AA27072689123"
+    },
+    {
+      "id": "ITR-CDR-0626",
+      "type": "income_tax_filing",
+      "client": "Cedar Works",
+      "owner": "Karan Shah",
+      "state": "open",
+      "reason": "OTP pending"
+    },
+    {
+      "id": "ITR-NV-0526",
+      "type": "income_tax_filing",
+      "client": "Nova Retail",
+      "owner": "Karan Shah",
+      "state": "completed",
+      "proof": "29871"
+    },
+    {
+      "id": "ITR-MHT-0426",
+      "type": "income_tax_filing",
+      "client": "Mehta Traders",
+      "owner": "Garima Sharma",
+      "state": "completed",
+      "proof": "MHT442901"
+    },
+    {
+      "id": "ITR-ORI-0626",
+      "type": "income_tax_filing",
+      "client": "Orion Foods",
+      "owner": "Riya Nair",
+      "state": "cancelled"
+    },
+    {
+      "id": "ITR-AST-0726",
+      "type": "income_tax_filing",
+      "client": "Aster Labs",
+      "owner": "Garima Sharma",
+      "state": "open",
+      "reason": "Bank statement pending"
+    },
+    {
+      "id": "ITR-BP-0526",
+      "type": "income_tax_filing",
+      "client": "BluePeak Services",
+      "owner": "Riya Nair",
+      "state": "completed"
+    },
+    {
+      "id": "ITR-SUN-0626",
+      "type": "income_tax_filing",
+      "client": "Sunbird Hospitality",
+      "owner": "Garima Sharma",
+      "state": "unknown",
+      "reason": "Claimed filed but no receipt"
+    },
+    {
+      "id": "ITR-KTE-AY26",
+      "type": "income_tax_filing",
+      "client": "Kite Exports",
+      "owner": "Garima Sharma",
+      "state": "completed",
+      "proof": "KTE260071"
+    },
+    {
+      "id": "GST-AL-0626",
+      "type": "gst_filing",
+      "client": "Alpha Manufacturing",
+      "owner": "Garima Sharma",
+      "state": "completed"
+    },
+    {
+      "id": "GST-BE-0626",
+      "type": "gst_filing",
+      "client": "Beta Logistics",
+      "owner": "Karan Shah",
+      "state": "open",
+      "reason": "OTP pending"
+    },
+    {
+      "id": "GST-GA-0526",
+      "type": "gst_filing",
+      "client": "Gamma Ventures",
+      "owner": "Riya Nair",
+      "state": "completed"
+    },
+    {
+      "id": "GST-DH-0626",
+      "type": "gst_filing",
+      "client": "Delta Hardware",
+      "owner": "Garima Sharma",
+      "state": "cancelled"
+    },
+    {
+      "id": "TDS-DL-Q1",
+      "type": "tds_return",
+      "client": "Delta Consulting",
+      "owner": "Garima Sharma",
+      "state": "completed"
+    },
+    {
+      "id": "TDS-EC-Q1",
+      "type": "tds_return",
+      "client": "Echo Media",
+      "owner": "Karan Shah",
+      "state": "open",
+      "reason": "Draft and salary correction pending"
+    },
+    {
+      "id": "CFA-Z-26",
+      "type": "corporate_filing_application",
+      "client": "Zeta Bio",
+      "owner": "Corporate Team",
+      "state": "open"
+    },
+    {
+      "id": "CFA-E-26",
+      "type": "corporate_filing_application",
+      "client": "Eta Mobility",
+      "owner": "Corporate Team",
+      "state": "completed"
+    },
+    {
+      "id": "CTR-HZ-01",
+      "type": "contract",
+      "client": "Horizon Textiles",
+      "owner": "Garima Sharma",
+      "state": "completed"
+    },
+    {
+      "id": "INV-JUL",
+      "type": "inventory_register",
+      "client": "Internal Operations",
+      "state": "current",
+      "location": "ops/weird-new-location/stk_jul_v7_reallylatest.pdf"
+    }
+  ],
+  "expectedEvaluations": [
+    {
+      "question": "How many income tax filings have we completed?",
+      "expected": 5,
+      "note": "ABC duplicate counts once; Sunbird is unknown; cancelled is excluded."
+    },
+    {
+      "question": "How many income tax matters are open?",
+      "expected": 2,
+      "note": "Cedar and Aster; Sunbird remains unknown, not open."
+    },
+    {
+      "question": "How many verified filings did Garima complete?",
+      "expected": 4,
+      "note": "ABC ITR, Mehta ITR, Alpha GST and Delta TDS. Contract is not a filing; Kite uses G Sharma and is also a filing, making 5 if all filing types and all periods are intended. This question should trigger scope clarification."
+    },
+    {
+      "question": "Which CRM-completed records are missing independent proof?",
+      "expectedItems": [
+        "Sunbird Hospitality"
+      ]
+    },
+    {
+      "question": "Where is the latest inventory file?",
+      "expected": "ops/weird-new-location/stk_jul_v7_reallylatest.pdf"
+    },
+    {
+      "question": "How many CFA matters are open?",
+      "expected": 1
+    }
+  ]
+}

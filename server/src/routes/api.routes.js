@@ -1,0 +1,18 @@
+import { Router } from 'express';
+import { apiController } from '../controllers/api.controller.js';
+const router = Router();
+router.get('/health',apiController.health);
+router.get('/tenants',apiController.tenants);
+router.get('/semantic-map/:tenantId',apiController.semanticMap);
+router.get('/connectors/jira/health',apiController.jiraHealth);
+router.get('/connectors/pipedrive/health',apiController.pipedriveHealth);
+router.post('/connectors/pipedrive/sync',apiController.pipedriveSync);
+router.get('/connectors/documents/health',apiController.documentsHealth);
+router.post('/connectors/documents/sync',apiController.documentsSync);
+router.get('/connectors/notion/health',apiController.notionHealth);
+router.post('/connectors/notion/sync',apiController.notionSync);
+router.get('/connectors/google-drive/health',apiController.googleDriveHealth);
+router.post('/connectors/google-drive/sync',apiController.googleDriveSync);
+router.post('/semantic/compile',apiController.compileSemantic);
+router.post('/questions/answer',apiController.ask);
+export default router;
