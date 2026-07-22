@@ -30,3 +30,16 @@ test('allows an explicitly broad business query but rejects an unknown filing su
   assert.equal(broad.requiresClarification, false);
   assert.equal(unknown.requiresClarification, true);
 });
+
+test('treats common CRM terms like leads as supported business questions', () => {
+  const plan = guardPlanForTenant('How many leads are open?', { ...base, scope: 'crm_deals' }, glossary);
+  assert.equal(plan.requiresClarification, false);
+  assert.equal(plan.supportedByTenant, true);
+});
+
+test('accepts natural pipeline and task phrasing', () => {
+  const pipeline = guardPlanForTenant('What is the current pipeline?', { ...base, scope: 'crm_deals' }, glossary);
+  const tasks = guardPlanForTenant('How many pending tasks are there?', { ...base, scope: 'business_items' }, glossary);
+  assert.equal(pipeline.requiresClarification, false);
+  assert.equal(tasks.requiresClarification, false);
+});

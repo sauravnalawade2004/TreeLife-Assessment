@@ -18,11 +18,13 @@ const normalize = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9
 
 function broadlyScopedQuestion(question, plan) {
   const q = question.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  if (plan.scope === 'crm_deals') return /\b(?:how many|list|show|all|total|overall)\b.*\bdeals?\b/.test(q);
-  if (plan.scope === 'filings') return /\b(?:how many|list|show)\s+(?:(?:open|pending|completed|complete|filed|cancelled)\s+)?(?:filings?|returns?)\b/.test(q)
-    || /\b(?:all|total|overall)\s+(?:filings?|returns?)\b/.test(q);
-  if (plan.scope === 'business_items') return /\b(?:how many|list|show)\s+(?:(?:open|pending|completed|complete|cancelled)\s+)?(?:matters?|cases?|business items?|records?|work items?)\b/.test(q)
-    || /\b(?:all|total|overall)\b.*\b(?:work|matters?|cases?|business items?|records?)\b/.test(q);
+  if (plan.scope === 'crm_deals') return /\b(?:how many|list|show|all|total|overall)\b.*\b(?:deals?|leads?|opportunities?|prospects?|pipeline|pipelines?)\b/.test(q)
+    || /\b(?:deals?|leads?|opportunities?|prospects?|pipeline|pipelines?)\b/.test(q);
+  if (plan.scope === 'filings') return /\b(?:how many|list|show)\s+(?:(?:open|pending|completed|complete|filed|cancelled)\s+)?(?:filings?|returns?|applications?)\b/.test(q)
+    || /\b(?:all|total|overall)\s+(?:filings?|returns?|applications?)\b/.test(q);
+  if (plan.scope === 'business_items') return /\b(?:how many|list|show)\s+(?:(?:open|pending|completed|complete|cancelled)\s+)?(?:matters?|cases?|business items?|records?|work items?|tasks?|leads?|opportunities?|prospects?|pipeline|pipelines?)\b/.test(q)
+    || /\b(?:all|total|overall)\b.*\b(?:work|matters?|cases?|business items?|records?|tasks?|leads?|opportunities?|prospects?|pipeline|pipelines?)\b/.test(q)
+    || /\b(?:deals?|leads?|opportunities?|prospects?|tasks?|pipeline|pipelines?)\b/.test(q);
   return false;
 }
 
@@ -54,7 +56,7 @@ function fallbackPlan(question, glossary = {}) {
       : /\bstatus|what.*happening|chal raha\b/.test(q) ? 'status'
         : /\bwas|is|did|verify\b/.test(q) ? 'verify'
           : /\bsummary|summarize\b/.test(q) ? 'summarize' : 'count';
-  const scope = /\bdeal/.test(q) ? 'crm_deals' : /\bfile|document|pdf/.test(q) && operation === 'locate' ? 'files' : /fil|return|itr|gst|tds|cfa/.test(q) ? 'filings' : 'business_items';
+  const scope = /\b(?:deal|lead|opportunity|prospect|pipeline)s?\b/.test(q) ? 'crm_deals' : /\bfile|document|pdf/.test(q) && operation === 'locate' ? 'files' : /fil|return|itr|gst|tds|cfa|application/.test(q) ? 'filings' : 'business_items';
   const topicPatterns = [
     ['income_tax_filing', /income tax|\bitr\b|it return/],
     ['gst_filing', /\bgst\b|gstr|3b/],
