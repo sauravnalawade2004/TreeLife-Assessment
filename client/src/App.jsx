@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowUp, BrainCircuit, CheckCircle2, ChevronDown, Database, FileSearch, GitBranch, MessageSquareText, RefreshCw, ShieldCheck, Sparkles, TriangleAlert } from 'lucide-react';
 import './live-ui.css';
 
-const API = 'http://localhost:4000/api';
+const API ='https://treelife-assessment.onrender.com/api';
 const samples = [
   'How many income tax filings have we completed?',
   'How many income tax matters are open?',
