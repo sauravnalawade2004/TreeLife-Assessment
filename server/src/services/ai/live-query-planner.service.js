@@ -77,9 +77,10 @@ export function guardPlanForTenant(question, inputPlan, glossary = {}) {
   const suppliedUnknownEntity = (plan.topic && !mappedTopic) || (plan.person && !mappedPerson) || (plan.client && !mappedClient);
   const broadPipedriveQuestion = broadlyScopedQuestion(question, plan);
   const broadOrgSignal = enoughBroadTenantSignal(question, plan);
+  const genericCrmQuery = (plan.scope === 'crm_deals' || plan.scope === 'business_items') && crmTermRegex.test(question.toLowerCase());
   const supported = plan.supportedByTenant !== false
     && !suppliedUnknownEntity
-    && Boolean(mappedTopic || mappedPerson || mappedClient || broadPipedriveQuestion || broadOrgSignal);
+    && Boolean(mappedTopic || mappedPerson || mappedClient || broadPipedriveQuestion || broadOrgSignal || genericCrmQuery);
   if (supported || plan.requiresClarification) return plan;
   return {
     ...plan,
@@ -138,8 +139,13 @@ export class LiveQueryPlannerService {
     const glossary = semanticMap?.glossary || {};
     if (!process.env.GEMINI_API_KEY) return { plan: guardPlanForTenant(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic' };
     try {
-      const plan = guardPlanForTenant(question, await this.#gemini(question, semanticMap), glossary);
-      return { plan, aiCalls: 1, provider: 'gemini' };
+      const geminiPlan = await this.#gemini(question, semanticMap);
+    const guardedGemini = guardPlanForTenant(question, geminiPlan, glossary);
+    const fallback = guardPlanForTenant(question, fallbackPlan(question, glossary), glossary);
+    if (guardedGemini.requiresClarification && !fallback.requiresClarification && fallback.supportedByTenant) {
+      return { plan: fallback, aiCalls: 1, provider: 'gemini' };
+    }
+    return { plan: guardedGemini, aiCalls: 1, provider: 'gemini' };
     } catch {
       return { plan: guardPlanForTenant(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic-fallback' };
     }

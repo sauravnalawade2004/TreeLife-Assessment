@@ -37,6 +37,15 @@ test('treats common CRM terms like leads as supported business questions', () =>
   assert.equal(plan.supportedByTenant, true);
 });
 
+test('accepts plain CRM keyword queries like leads and deals completed', () => {
+  const leadPlan = guardPlanForTenant('leads', { ...base, scope: 'crm_deals' }, glossary);
+  const dealsPlan = guardPlanForTenant('deals completed', { ...base, scope: 'crm_deals' }, glossary);
+  assert.equal(leadPlan.supportedByTenant, true);
+  assert.equal(leadPlan.requiresClarification, false);
+  assert.equal(dealsPlan.supportedByTenant, true);
+  assert.equal(dealsPlan.requiresClarification, false);
+});
+
 test('accepts natural pipeline and task phrasing', () => {
   const pipeline = guardPlanForTenant('What is the current pipeline?', { ...base, scope: 'crm_deals' }, glossary);
   const tasks = guardPlanForTenant('How many pending tasks are there?', { ...base, scope: 'business_items' }, glossary);
@@ -58,6 +67,15 @@ test('accepts CRM phrasing across client, company, customer, and organization sy
     assert.equal(plan.requiresClarification, false, `Failed on: ${plan}`);
     assert.equal(plan.supportedByTenant, true, `Failed on: ${plan}`);
   }
+});
+
+test('accepts direct CRM topic-only queries for leads and deals', () => {
+  const leadPlan = guardPlanForTenant('leads', { ...base, scope: 'crm_deals' }, glossary);
+  const dealPlan = guardPlanForTenant('deals', { ...base, scope: 'crm_deals' }, glossary);
+  assert.equal(leadPlan.requiresClarification, false);
+  assert.equal(leadPlan.supportedByTenant, true);
+  assert.equal(dealPlan.requiresClarification, false);
+  assert.equal(dealPlan.supportedByTenant, true);
 });
 
 test('extracts explicit month and year ranges from plain language', async () => {
