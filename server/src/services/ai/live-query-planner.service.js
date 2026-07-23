@@ -142,7 +142,15 @@ export class LiveQueryPlannerService {
       const geminiPlan = await this.#gemini(question, semanticMap);
     const guardedGemini = guardPlanForTenant(question, geminiPlan, glossary);
     const fallback = guardPlanForTenant(question, fallbackPlan(question, glossary), glossary);
+    const genericCrm = crmTermRegex.test(question.toLowerCase()) && ['crm_deals','business_items'].includes(fallback.scope);
+    const explicitListRequest = /\b(which|list|show|dikhao|where|where are|where is)\b/.test(question.toLowerCase());
     if (guardedGemini.requiresClarification && !fallback.requiresClarification && fallback.supportedByTenant) {
+      return { plan: fallback, aiCalls: 1, provider: 'gemini' };
+    }
+    if (genericCrm && fallback.operation === 'count' && guardedGemini.operation !== 'count' && !explicitListRequest) {
+      return { plan: fallback, aiCalls: 1, provider: 'gemini' };
+    }
+    if (!guardedGemini.supportedByTenant && fallback.supportedByTenant) {
       return { plan: fallback, aiCalls: 1, provider: 'gemini' };
     }
     return { plan: guardedGemini, aiCalls: 1, provider: 'gemini' };

@@ -4,6 +4,8 @@ import { TenantModel } from '../../models/Tenant.js';
 import { liveQueryPlannerService } from '../ai/live-query-planner.service.js';
 
 const normalize = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const crmEntityTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses'];
+const crmTermRegex = new RegExp(`\\b(?:${crmEntityTerms.join('|')})\\b`);
 const filingTopic = (topic) => /filing|return|application/.test(topic || '');
 const liveConnectorIds = new Set(['pipedrive-acme', 'documents-acme', 'google-drive-acme', 'notion-acme']);
 
@@ -151,8 +153,8 @@ export class LiveAnswerService {
     });
     const matched = scopedCandidates.filter((truth) => !plan.state || truth.state === plan.state);
     const unresolved = scopedCandidates.filter((truth) => truth.state === 'unknown' || truth.conflict);
-    const broadCount = /\b(?:total|overall|all|how many|count)\b/.test(String(question || '').toLowerCase()) && /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|stage|stages|account|accounts|client|clients|customer|customers|company|companies|business|businesses)\b/.test(String(question || '').toLowerCase());
-    const countCandidates = broadCount ? truths.filter((truth) => truth.sources.includes('pipedrive')) : [];
+    const broadCount = plan.operation === 'count' && crmTermRegex.test(String(question || '').toLowerCase());
+    const countCandidates = broadCount ? truths.filter((truth) => truth.sources.includes('pipedrive') && inRange(truth, plan.timeRange)) : [];
     const allHealthy = sourceCoverage.filter((item) => item.status === 'checked').every((item) => ['healthy', 'demo'].includes(item.health));
     let status = 'ANSWERED', answer = null;
     let evidenceItems = matched;
