@@ -129,17 +129,27 @@ function buildBundles(records) {
     const notes = notesByDeal.get(dealId) || [];
     const customFields = deal.fields.custom_fields || {};
     const customText = Object.entries(customFields).map(([name, item]) => `${name}: ${item?.value ?? item}`).join('; ');
+    const rawSummary = Object.entries(deal.fields.raw || {})
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .filter(([key]) => !['custom_fields'].includes(key))
+      .map(([key, value]) => {
+        if (typeof value === 'object') return `${key}: ${JSON.stringify(value)}`;
+        return `${key}: ${String(value)}`;
+      })
+      .join('\n');
+    const titleValue = deal.fields.title || deal.fields.summary || deal.fields.raw?.title || deal.fields.raw?.name || deal.fields.raw?.deal_title || '';
+    const statusValue = deal.fields.official_status || deal.fields.raw?.status || deal.fields.raw?.stage || deal.fields.raw?.pipeline_stage_name || '';
     bundles.push({
       inputId: deal.id,
       source: 'pipedrive',
       sourceRecordId: deal.id,
-      title: deal.fields.title,
+      title: titleValue,
       organization,
-      officialStatus: deal.fields.official_status,
+      officialStatus: statusValue,
       customFields,
       notes,
       path: null,
-      content: `${deal.fields.title || ''}\nOrganization: ${organization || ''}\nOfficial status: ${deal.fields.official_status || ''}\n${customText}\n${notes.join('\n')}`
+      content: `${titleValue || ''}\nOrganization: ${organization || ''}\nOfficial status: ${statusValue || ''}\n${customText}\n${notes.join('\n')}\n${rawSummary}`
     });
   }
   for (const document of records.filter((record) => ['documents', 'google_drive'].includes(record.source) && record.entity === 'file')) {

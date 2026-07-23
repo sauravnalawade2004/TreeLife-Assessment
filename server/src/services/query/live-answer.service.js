@@ -66,6 +66,15 @@ function topicMatches(truth, plan) {
   return true;
 }
 
+function broadCrmMatch(question, truth) {
+  const q = String(question || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const text = `${truth.client || ''} ${truth.topic || ''} ${truth.reference || ''} ${truth.evidence?.map((item) => item?.text || '').join(' ') || ''}`.toLowerCase();
+  const crmTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts'];
+  const asksForCrm = crmTerms.some((term) => q.includes(term));
+  if (!asksForCrm) return false;
+  return crmTerms.some((term) => text.includes(term)) || truth.sources.includes('pipedrive');
+}
+
 function coverage(tenant, checkedSources) {
   return activeConnectors(tenant?.connectors || []).map((connector) => ({
     source: connector.type,
@@ -105,7 +114,7 @@ export class LiveAnswerService {
         reasoning: ['The planner found a genuine business-language ambiguity and stopped before executing a calculation.']
       };
     }
-    const candidates = truths.filter((truth) => topicMatches(truth, plan));
+    const candidates = truths.filter((truth) => topicMatches(truth, plan) || broadCrmMatch(question, truth));
     const scopedCandidates = candidates.filter((truth) => {
       if (plan.person && ![...(truth.owners || []), ...(truth.ownerAliases || [])].some((owner) => fuzzyMatch(owner, plan.person))) return false;
       if (plan.client && !fuzzyMatch(truth.client, plan.client)) return false;
@@ -114,6 +123,8 @@ export class LiveAnswerService {
     });
     const matched = scopedCandidates.filter((truth) => !plan.state || truth.state === plan.state);
     const unresolved = scopedCandidates.filter((truth) => truth.state === 'unknown' || truth.conflict);
+    const broadCount = /\b(?:total|overall|all|how many|count)\b/.test(String(question || '').toLowerCase()) && /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|stage|stages|account|accounts)\b/.test(String(question || '').toLowerCase());
+    const countCandidates = broadCount ? truths.filter((truth) => truth.sources.includes('pipedrive')) : [];
     const allHealthy = sourceCoverage.filter((item) => item.status === 'checked').every((item) => ['healthy', 'demo'].includes(item.health));
     let status = 'ANSWERED', answer = null;
     let evidenceItems = matched;
@@ -139,8 +150,11 @@ export class LiveAnswerService {
       else answer = { value: matched.map((truth) => ({ client: truth.client, topic: truth.topic, state: truth.state, reference: truth.reference })), text: matched.map((truth) => `${truth.client || truth.reference || truth.truthId} (${truth.state})`).join(', ') };
       if (status === 'UNKNOWN') answer = { value: null, text: 'A verified list cannot be returned because relevant evidence is incomplete or conflicting.' };
     } else {
+      if (!matched.length && broadCount && countCandidates.length) {
+        evidenceItems = countCandidates;
+      }
       if (!matched.length) status = unresolved.length ? 'UNKNOWN' : (allHealthy ? 'VERIFIED_ZERO' : 'UNKNOWN');
-      const value = matched.length;
+      const value = matched.length || (broadCount ? countCandidates.length : 0);
       answer = status === 'UNKNOWN'
         ? { value: null, unit: label(plan.topic || plan.scope), text: 'A verified number cannot be given because relevant evidence is incomplete or conflicting.' }
         : status === 'VERIFIED_ZERO'
