@@ -43,3 +43,27 @@ test('accepts natural pipeline and task phrasing', () => {
   assert.equal(pipeline.requiresClarification, false);
   assert.equal(tasks.requiresClarification, false);
 });
+
+test('accepts CRM phrasing across client, company, customer, and organization synonyms', () => {
+  const queries = [
+    'How many clients do we have?',
+    'How many customers are in the pipeline?',
+    'What is the total number of companies?',
+    'Show me all organizations.',
+    'Where are the deals?',
+    'Give me the count of leads.'
+  ];
+  const plans = queries.map((query) => guardPlanForTenant(query, { ...base, scope: 'crm_deals' }, glossary));
+  for (const plan of plans) {
+    assert.equal(plan.requiresClarification, false, `Failed on: ${plan}`);
+    assert.equal(plan.supportedByTenant, true, `Failed on: ${plan}`);
+  }
+});
+
+test('extracts explicit month and year ranges from plain language', async () => {
+  const service = new (await import('../src/services/ai/live-query-planner.service.js')).LiveQueryPlannerService();
+  const result = await service.plan('How many deals were open in July 2026?', { glossary: { topics: [], people: {}, clients: [] } });
+  assert.equal(result.plan.scope, 'crm_deals');
+  assert.equal(result.plan.timeRange, '2026-07');
+  assert.equal(result.plan.requiresClarification, false);
+});

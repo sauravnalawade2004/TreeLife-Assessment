@@ -39,11 +39,13 @@ function fuzzyMatch(candidate, query) {
 
 function periodDate(period) {
   const value = String(period ?? '').trim().toLowerCase();
-  const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
-  const word = value.match(/(jan|feb|mar|apr|may|jun|june|jul|july|aug|sep|oct|nov|dec)[a-z]*[-/ ]*(\d{2,4})/);
+  const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11 };
+  const word = value.match(/(jan|feb|mar|apr|may|jun|june|jul|july|aug|sep|sept|oct|nov|dec)[a-z]*[-/ ]*(\d{2,4})/);
   if (word) return new Date(Date.UTC(Number(word[2].length === 2 ? `20${word[2]}` : word[2]), months[word[1]], 1));
   const numeric = value.match(/\b(0?[1-9]|1[0-2])[-/ ]?(\d{2,4})\b/);
   if (numeric) return new Date(Date.UTC(Number(numeric[2].length === 2 ? `20${numeric[2]}` : numeric[2]), Number(numeric[1]) - 1, 1));
+  const yearOnly = value.match(/\b(20\d{2})\b/);
+  if (yearOnly) return new Date(Date.UTC(Number(yearOnly[1]), 0, 1));
   return null;
 }
 
@@ -52,10 +54,36 @@ function inRange(truth, range) {
   const date = truth.eventDate ? new Date(truth.eventDate) : periodDate(truth.period);
   if (!date || Number.isNaN(date.getTime())) return false;
   const now = new Date();
-  const monthOffset = range === 'last_month' ? -1 : 0;
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthOffset, 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthOffset + 1, 1));
-  return date >= start && date < end;
+  if (range === 'last_month' || range === 'this_month') {
+    const monthOffset = range === 'last_month' ? -1 : 0;
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthOffset, 1));
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthOffset + 1, 1));
+    return date >= start && date < end;
+  }
+  if (range === 'this_year') {
+    const start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+    const end = new Date(Date.UTC(now.getUTCFullYear() + 1, 0, 1));
+    return date >= start && date < end;
+  }
+  if (range === 'last_year') {
+    const start = new Date(Date.UTC(now.getUTCFullYear() - 1, 0, 1));
+    const end = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+    return date >= start && date < end;
+  }
+  const yearMonth = range.match(/^(20\d{2})-(0[1-9]|1[0-2])$/);
+  if (yearMonth) {
+    const year = Number(yearMonth[1]); const month = Number(yearMonth[2]) - 1;
+    const start = new Date(Date.UTC(year, month, 1));
+    const end = new Date(Date.UTC(year, month + 1, 1));
+    return date >= start && date < end;
+  }
+  const yearOnly = range.match(/^(20\d{2})$/);
+  if (yearOnly) {
+    const start = new Date(Date.UTC(Number(yearOnly[1]), 0, 1));
+    const end = new Date(Date.UTC(Number(yearOnly[1]) + 1, 0, 1));
+    return date >= start && date < end;
+  }
+  return true;
 }
 
 function topicMatches(truth, plan) {
@@ -69,7 +97,7 @@ function topicMatches(truth, plan) {
 function broadCrmMatch(question, truth) {
   const q = String(question || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const text = `${truth.client || ''} ${truth.topic || ''} ${truth.reference || ''} ${truth.evidence?.map((item) => item?.text || '').join(' ') || ''}`.toLowerCase();
-  const crmTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts'];
+  const crmTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses'];
   const asksForCrm = crmTerms.some((term) => q.includes(term));
   if (!asksForCrm) return false;
   return crmTerms.some((term) => text.includes(term)) || truth.sources.includes('pipedrive');
@@ -123,7 +151,7 @@ export class LiveAnswerService {
     });
     const matched = scopedCandidates.filter((truth) => !plan.state || truth.state === plan.state);
     const unresolved = scopedCandidates.filter((truth) => truth.state === 'unknown' || truth.conflict);
-    const broadCount = /\b(?:total|overall|all|how many|count)\b/.test(String(question || '').toLowerCase()) && /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|stage|stages|account|accounts)\b/.test(String(question || '').toLowerCase());
+    const broadCount = /\b(?:total|overall|all|how many|count)\b/.test(String(question || '').toLowerCase()) && /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|stage|stages|account|accounts|client|clients|customer|customers|company|companies|business|businesses)\b/.test(String(question || '').toLowerCase());
     const countCandidates = broadCount ? truths.filter((truth) => truth.sources.includes('pipedrive')) : [];
     const allHealthy = sourceCoverage.filter((item) => item.status === 'checked').every((item) => ['healthy', 'demo'].includes(item.health));
     let status = 'ANSWERED', answer = null;

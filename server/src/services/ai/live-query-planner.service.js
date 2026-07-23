@@ -7,7 +7,7 @@ const Plan = z.object({
   person: z.string().nullable().default(null),
   client: z.string().nullable().default(null),
   state: z.enum(['completed', 'open', 'cancelled', 'unknown']).nullable().default(null),
-  timeRange: z.enum(['all', 'last_month', 'this_month']).default('all'),
+  timeRange: z.string().default('all'),
   expandedTerms: z.array(z.string()).default([]),
   supportedByTenant: z.boolean().default(true),
   requiresClarification: z.boolean().default(false),
@@ -15,18 +15,55 @@ const Plan = z.object({
 });
 
 const normalize = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const crmEntityTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'org', 'orgs', 'stage', 'stages', 'owner', 'owners', 'contact', 'contacts', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses'];
+const crmTermRegex = new RegExp(`\\b(?:${crmEntityTerms.join('|')})\\b`);
+const broadBusinessQuery = /\b(?:how many|how much|how many of|what is the|what are the|what are|total|overall|count|number of|show me|list|give me|all of|any of|where is|where are|status of|how many have|how many were|how many are)\b/;
+
+function normalizeMonth(value) {
+  const monthMap = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', july: '07', jul: '07', aug: '08', sep: '09', sept: '09', oct: '10', nov: '11', dec: '12'
+  };
+  const key = String(value || '').trim().toLowerCase().slice(0, 3);
+  return monthMap[key] || null;
+}
+
+function extractTimeRange(question) {
+  const q = question.toLowerCase();
+  if (/(?:last month|pichle mahine|pichhle mahine)/.test(q)) return 'last_month';
+  if (/(?:this month|is mahine|aaj ke mahine)/.test(q)) return 'this_month';
+  if (/(?:this year|is saal|is varsh)/.test(q)) return String(new Date().getUTCFullYear());
+  if (/(?:last year|pichla saal|pichhle saal)/.test(q)) return String(new Date().getUTCFullYear() - 1);
+
+  const monthMatch = q.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b(?:\s+(\d{2,4}|this year|last year))?/);
+  if (monthMatch) {
+    const month = normalizeMonth(monthMatch[1]);
+    let year = monthMatch[2];
+    if (year === 'this year') year = String(new Date().getUTCFullYear());
+    if (year === 'last year') year = String(new Date().getUTCFullYear() - 1);
+    if (year && /^\d{2}$/.test(year)) year = `20${year}`;
+    if (month && year && /^\d{4}$/.test(year)) return `${year}-${month}`;
+  }
+
+  const yearMatch = q.match(/\b(20\d{2})\b/);
+  if (yearMatch) return yearMatch[1];
+  return 'all';
+}
 
 function broadlyScopedQuestion(question, plan) {
   const q = question.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  const crmWords = /\b(?:deals?|leads?|opportunities?|prospects?|pipeline|pipelines?|organizations?|orgs?|stages?|owners?|contacts?|accounts?)\b/;
-  if (plan.scope === 'crm_deals') return /\b(?:how many|list|show|all|total|overall)\b.*\b(?:deals?|leads?|opportunities?|prospects?|pipeline|pipelines?|organizations?|orgs?|stages?)\b/.test(q)
-    || crmWords.test(q);
-  if (plan.scope === 'filings') return /\b(?:how many|list|show)\s+(?:(?:open|pending|completed|complete|filed|cancelled)\s+)?(?:filings?|returns?|applications?)\b/.test(q)
+  if (plan.scope === 'crm_deals') return broadBusinessQuery.test(q) && crmTermRegex.test(q);
+  if (plan.scope === 'filings') return /\b(?:how many|how much|list|show|all|total|overall)\b.*\b(?:filings?|returns?|applications?)\b/.test(q)
     || /\b(?:all|total|overall)\s+(?:filings?|returns?|applications?)\b/.test(q);
-  if (plan.scope === 'business_items') return /\b(?:how many|list|show)\s+(?:(?:open|pending|completed|complete|cancelled)\s+)?(?:matters?|cases?|business items?|records?|work items?|tasks?|leads?|opportunities?|prospects?|pipeline|pipelines?|organizations?|orgs?|stages?)\b/.test(q)
-    || /\b(?:all|total|overall)\b.*\b(?:work|matters?|cases?|business items?|records?|tasks?|leads?|opportunities?|prospects?|pipeline|pipelines?|organizations?|orgs?|stages?)\b/.test(q)
-    || crmWords.test(q);
+  if (plan.scope === 'business_items') return broadBusinessQuery.test(q) && crmTermRegex.test(q)
+    || /\b(?:all|total|overall)\b.*\b(?:work|matters?|cases?|business items?|records?|tasks?)\b/.test(q);
   return false;
+}
+
+function enoughBroadTenantSignal(question, plan) {
+  const q = question.toLowerCase();
+  const countWords = broadBusinessQuery.test(q);
+  const orgWords = crmTermRegex.test(q);
+  return countWords && orgWords && ['crm_deals','business_items'].includes(plan.scope);
 }
 
 export function guardPlanForTenant(question, inputPlan, glossary = {}) {
@@ -39,9 +76,10 @@ export function guardPlanForTenant(question, inputPlan, glossary = {}) {
   const mappedClient = plan.client && clients.some((client) => client === normalize(plan.client));
   const suppliedUnknownEntity = (plan.topic && !mappedTopic) || (plan.person && !mappedPerson) || (plan.client && !mappedClient);
   const broadPipedriveQuestion = broadlyScopedQuestion(question, plan);
+  const broadOrgSignal = enoughBroadTenantSignal(question, plan);
   const supported = plan.supportedByTenant !== false
     && !suppliedUnknownEntity
-    && Boolean(mappedTopic || mappedPerson || mappedClient || broadPipedriveQuestion);
+    && Boolean(mappedTopic || mappedPerson || mappedClient || broadPipedriveQuestion || broadOrgSignal);
   if (supported || plan.requiresClarification) return plan;
   return {
     ...plan,
@@ -58,7 +96,7 @@ function fallbackPlan(question, glossary = {}) {
       : /\bstatus|what.*happening|chal raha\b/.test(q) ? 'status'
         : /\bwas|is|did|verify\b/.test(q) ? 'verify'
           : /\bsummary|summarize\b/.test(q) ? 'summarize' : 'count';
-  const scope = /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|org|orgs|stage|stages|owner|owners|contact|contacts|account|accounts)\b/.test(q) ? 'crm_deals' : /\bfile|document|pdf/.test(q) && operation === 'locate' ? 'files' : /fil|return|itr|gst|tds|cfa|application/.test(q) ? 'filings' : 'business_items';
+  const scope = /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|org|orgs|stage|stages|owner|owners|contact|contacts|account|accounts|client|clients|customer|customers|company|companies|business|businesses)\b/.test(q) ? 'crm_deals' : /\bfile|document|pdf\b/.test(q) && operation === 'locate' ? 'files' : /fil|return|itr|gst|tds|cfa|application/.test(q) ? 'filings' : 'business_items';
   const topicPatterns = [
     ['income_tax_filing', /income tax|\bitr\b|it return/],
     ['gst_filing', /\bgst\b|gstr|3b/],
@@ -87,7 +125,7 @@ function fallbackPlan(question, glossary = {}) {
     person,
     client,
     state,
-    timeRange: /last month|pichle mahine/.test(q) ? 'last_month' : /this month|is mahine/.test(q) ? 'this_month' : 'all',
+    timeRange: extractTimeRange(q),
     expandedTerms: topic ? [topic, topic.replaceAll('_', ' ')] : [],
     supportedByTenant: true,
     requiresClarification: false,
@@ -114,7 +152,7 @@ export class LiveQueryPlannerService {
 Allowed operation: count,list,locate,status,verify,summarize.
 Allowed scope: crm_deals,filings,files,business_items.
 Allowed state: completed,open,cancelled,unknown or null.
-timeRange: all,last_month,this_month.
+Allowed timeRange: all,last_month,this_month,this_year,last_year,YYYY,YYYY-MM.
 Map user terminology to one available topic when supported by the glossary. Use expandedTerms for synonyms and abbreviations. "Filed/filled/done/submitted" means completed. "Open/pending/chal raha" means open.
 If a term is genuinely ambiguous (for example closed could include completed and cancelled), set requiresClarification and provide one short clarification. Do not invent a client or person.
 Set supportedByTenant=false and requiresClarification=true when the question is unrelated to the connected business data or its subject cannot be mapped to the tenant glossary. Never map an unrelated general-knowledge question to business_items.

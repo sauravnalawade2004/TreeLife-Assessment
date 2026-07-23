@@ -79,6 +79,13 @@ test('status evidence follows the selected actual item without changing numeric 
     assert.equal(countResult.status, 'ANSWERED');
     assert.equal(countResult.answer.value, 1);
     assert.deepEqual(countResult.evidence.matchedRecordIds, ['filed-truth']);
+
+    truths = [truth({ truthId: 'july-truth', period: 'Jul26', state: 'completed', client: 'Cedar Works', conflict: false, sourceRecordIds: ['deal:4'] })];
+    plan = { ...basePlan, operation: 'count', client: null, timeRange: '2026-07' };
+    const julyResult = await service.answer('acme-law', 'How many completed filings occurred in July 2026?');
+    assert.equal(julyResult.status, 'ANSWERED');
+    assert.equal(julyResult.answer.value, 1);
+    assert.deepEqual(julyResult.evidence.matchedRecordIds, ['july-truth']);
   } finally {
     BusinessTruthModel.find = originals.businessFind;
     SemanticMapModel.findOne = originals.mapFindOne;
