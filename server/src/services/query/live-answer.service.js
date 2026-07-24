@@ -153,7 +153,7 @@ export class LiveAnswerService {
     });
     const matched = scopedCandidates.filter((truth) => !plan.state || truth.state === plan.state);
     const unresolved = scopedCandidates.filter((truth) => truth.state === 'unknown' || truth.conflict);
-    const broadCount = plan.operation === 'count' && crmTermRegex.test(String(question || '').toLowerCase());
+    const broadCount = plan.operation === 'count' && !plan.topic && crmTermRegex.test(String(question || '').toLowerCase());
     const countCandidates = broadCount ? truths.filter((truth) => truth.sources.includes('pipedrive') && inRange(truth, plan.timeRange)) : [];
     const allHealthy = sourceCoverage.filter((item) => item.status === 'checked').every((item) => ['healthy', 'demo'].includes(item.health));
     let status = 'ANSWERED', answer = null;

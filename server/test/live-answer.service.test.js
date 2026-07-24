@@ -80,6 +80,16 @@ test('status evidence follows the selected actual item without changing numeric 
     assert.equal(countResult.answer.value, 1);
     assert.deepEqual(countResult.evidence.matchedRecordIds, ['filed-truth']);
 
+    truths = [
+      truth({ truthId: 'july-truth', period: 'Jul26', state: 'completed', client: 'Cedar Works', conflict: false, sourceRecordIds: ['deal:4'] }),
+      truth({ truthId: 'education-lead', topic: 'education_deal', client: 'Education Private Limited', state: 'open', conflict: false, sourceRecordIds: ['deal:5'], sources: ['pipedrive'] })
+    ];
+    plan = { ...basePlan, operation: 'count', client: null, topic: 'education_deal', state: null, scope: 'crm_deals' };
+    const educationResult = await service.answer('acme-law', 'How many education deals are there?');
+    assert.equal(educationResult.status, 'ANSWERED');
+    assert.equal(educationResult.answer.value, 1);
+    assert.deepEqual(educationResult.evidence.matchedRecordIds, ['education-lead']);
+
     truths = [truth({ truthId: 'july-truth', period: 'Jul26', state: 'completed', client: 'Cedar Works', conflict: false, sourceRecordIds: ['deal:4'] })];
     plan = { ...basePlan, operation: 'count', client: null, timeRange: '2026-07' };
     const julyResult = await service.answer('acme-law', 'How many completed filings occurred in July 2026?');
