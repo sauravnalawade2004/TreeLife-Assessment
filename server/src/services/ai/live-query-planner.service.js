@@ -15,7 +15,7 @@ const Plan = z.object({
 });
 
 const normalize = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
-const crmEntityTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'org', 'orgs', 'stage', 'stages', 'owner', 'owners', 'contact', 'contacts', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses'];
+const crmEntityTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'org', 'orgs', 'stage', 'stages', 'owner', 'owners', 'contact', 'contacts', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses', 'record', 'records', 'item', 'items', 'entry', 'entries', 'member', 'members', 'case', 'cases', 'application', 'applications', 'student', 'students', 'enrollment', 'enrollments'];
 const crmTermRegex = new RegExp(`\\b(?:${crmEntityTerms.join('|')})\\b`);
 const broadBusinessQuery = /\b(?:how many|how much|how many of|what is the|what are the|what are|total|overall|count|number of|show me|list|give me|all of|any of|where is|where are|status of|how many have|how many were|how many are)\b/;
 
@@ -66,12 +66,25 @@ function enoughBroadTenantSignal(question, plan) {
   return countWords && orgWords && ['crm_deals','business_items'].includes(plan.scope);
 }
 
+function topicMatchesQuestion(question, topic) {
+  const qTokens = new Set(String(question || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean));
+  const tTokens = String(topic || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (!qTokens.size || !tTokens.length) return false;
+  const normalizedQ = new Set([...qTokens].map((token) => token.replace(/s$/u, '')));
+  return tTokens.some((token) => {
+    const stem = token.replace(/s$/u, '');
+    return qTokens.has(token) || qTokens.has(stem) || normalizedQ.has(stem) || normalizedQ.has(token);
+  });
+}
+
 export function guardPlanForTenant(question, inputPlan, glossary = {}) {
   const plan = Plan.parse(inputPlan);
   const topics = (glossary.topics || []).map(normalize);
   const people = Object.entries(glossary.people || {}).flatMap(([person, aliases]) => [person, ...(aliases || [])]).map(normalize);
   const clients = (glossary.clients || []).map(normalize);
-  const mappedTopic = plan.topic && topics.includes(normalize(plan.topic));
+  const mappedTopic = Boolean(plan.topic && topics.includes(normalize(plan.topic)))
+    || Boolean(plan.topic && topics.some((topic) => topicMatchesQuestion(String(plan.topic), topic)))
+    || Boolean(topics.some((topic) => topicMatchesQuestion(question, topic)));
   const mappedPerson = plan.person && people.some((person) => person === normalize(plan.person));
   const mappedClient = plan.client && clients.some((client) => client === normalize(plan.client));
   const suppliedUnknownEntity = (plan.topic && !mappedTopic) || (plan.person && !mappedPerson) || (plan.client && !mappedClient);

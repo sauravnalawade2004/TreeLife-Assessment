@@ -53,6 +53,24 @@ test('accepts natural pipeline and task phrasing', () => {
   assert.equal(tasks.requiresClarification, false);
 });
 
+test('accepts generic business words like record and application', () => {
+  const recordPlan = guardPlanForTenant('How many records are there?', { ...base, scope: 'business_items' }, glossary);
+  const applicationPlan = guardPlanForTenant('How many applications are open?', { ...base, scope: 'business_items' }, glossary);
+  assert.equal(recordPlan.requiresClarification, false);
+  assert.equal(applicationPlan.requiresClarification, false);
+  assert.equal(recordPlan.supportedByTenant, true);
+  assert.equal(applicationPlan.supportedByTenant, true);
+});
+
+test('accepts student and enrollment phrasing for unfamiliar domains', () => {
+  const studentPlan = guardPlanForTenant('How many students have pending fees?', { ...base, scope: 'business_items' }, { ...glossary, topics: ['student_enrollment'] });
+  const enrollmentPlan = guardPlanForTenant('How many enrollments are open?', { ...base, scope: 'business_items' }, { ...glossary, topics: ['student_enrollment'] });
+  assert.equal(studentPlan.requiresClarification, false);
+  assert.equal(enrollmentPlan.requiresClarification, false);
+  assert.equal(studentPlan.supportedByTenant, true);
+  assert.equal(enrollmentPlan.supportedByTenant, true);
+});
+
 test('accepts CRM phrasing across client, company, customer, and organization synonyms', () => {
   const queries = [
     'How many clients do we have?',

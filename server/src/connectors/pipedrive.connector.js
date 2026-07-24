@@ -26,7 +26,7 @@ export class PipedriveConnector {
         'x-api-token': resolved.apiToken
       },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(20000)
     });
     if (response.status === 429) {
       throw Object.assign(new Error('Pipedrive rate limited the sync'), {
@@ -82,7 +82,7 @@ export class PipedriveConnector {
   async fetchV2Collection(path, searchParams = {}, config) {
     const items = [];
     let cursor;
-    for (let page = 0; page < 50; page += 1) {
+    for (let page = 0; page < 200; page += 1) {
       const payload = await this.request(path, { searchParams: { ...searchParams, limit: 500, cursor }, config });
       if (Array.isArray(payload.data)) items.push(...payload.data);
       cursor = payload.additional_data?.next_cursor
@@ -96,8 +96,8 @@ export class PipedriveConnector {
   async fetchV1Collection(path, searchParams = {}, config) {
     const items = [];
     let start = 0;
-    for (let page = 0; page < 50; page += 1) {
-      const payload = await this.request(path, { searchParams: { ...searchParams, start, limit: 50 }, config });
+    for (let page = 0; page < 500; page += 1) {
+      const payload = await this.request(path, { searchParams: { ...searchParams, start, limit: 100 }, config });
       if (Array.isArray(payload.data)) items.push(...payload.data);
       const pagination = payload.additional_data?.pagination;
       if (!pagination?.more_items_in_collection) break;
@@ -126,3 +126,4 @@ export class PipedriveConnector {
 }
 
 export const pipedriveConnector = new PipedriveConnector();
+  

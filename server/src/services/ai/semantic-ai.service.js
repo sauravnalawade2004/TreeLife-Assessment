@@ -26,47 +26,62 @@ function match(text, pattern) {
   return cleanText(text).match(pattern)?.[1]?.trim() || null;
 }
 
+function slugifyTopic(value) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'business_record';
+}
+
+function inferGenericTopic(bundle) {
+  const title = cleanText(bundle.title || '');
+  const content = cleanText(bundle.content || '');
+  const textSources = [title, content, ...Object.keys(bundle.customFields || {}).map((key) => String(key))].filter(Boolean);
+  const customNames = Object.keys(bundle.customFields || {}).filter(Boolean).map((name) => String(name));
+  const titleCandidate = title && !/^(record|item|entry|business|matter|task)$/i.test(title) ? title : null;
+  const distinctiveCustom = customNames.find((name) => !/id|status|name|date|created|updated|owner|amount|value|note|description|details|summary/i.test(name))
+    || customNames.find((name) => !/id|status|name|date|created|updated|owner|amount|value|note|description|details|summary/i.test(name) && name.length >= 3);
+  const textCandidate = textSources.find((value) => value.length >= 3 && !/^(the|and|for|with|from|to|of|in|on|is|are|a|an|business|record|item|entry|task)$/i.test(value));
+  const candidate = titleCandidate || distinctiveCustom || textCandidate || cleanText(bundle.title || bundle.content || 'business_record');
+  return slugifyTopic(candidate || (bundle.source ? `${bundle.source}_record` : 'business_record'));
+}
+
 function fallbackFact(bundle) {
   const content = cleanText(bundle.content || JSON.stringify(bundle)).toLowerCase();
   const custom = bundle.customFields || {};
-  let topic = 'unknown';
-  if (/\bgst|gstr|3b\b/.test(content)) topic = 'gst_filing';
-  else if (/\btds\b|26q|challan/.test(content)) topic = 'tds_return';
-  else if (/\bcfa\b|corporate filing|\bmca\b|\bsrn\b/.test(content)) topic = 'corporate_filing_application';
-  else if (/inventory|stock register|stock jul/.test(content)) topic = 'inventory_register';
-  else if (/agreement|contract|redline/.test(content)) topic = 'contract';
-  else if (/income tax|\bitr\b|tax return|return submission|e-filing/.test(content)) topic = 'income_tax_filing';
+  const inferredTopic = inferGenericTopic(bundle);
+  const topic = inferredTopic || 'unknown';
 
   let lifecycleClaim = 'unknown';
-  if (/cancelled|canceled|client said stop|stop the|no filing|no return should/.test(content)) lifecycleClaim = 'cancelled';
-  else if (/draft|not submitted|otp pending|missing|not ready|do not submit|remains open|pending/.test(content)) lifecycleClaim = 'open';
-  else if (/successfully|acknowledgement|submission receipt|arn .*(received|confirmed)|srn received|status: filed|upload ok|status: accepted|signed by both|current stock register/.test(content)) lifecycleClaim = 'completed';
+  if (/cancelled|canceled|stopped|withdrawn|no longer|not proceeding/.test(content)) lifecycleClaim = 'cancelled';
+  else if (/draft|not submitted|pending|waiting|not yet|in progress|in_progress|remains open|open|ongoing/.test(content)) lifecycleClaim = 'open';
+  else if (/done|completed|finished|closed|confirmed|received|submitted|successful|accepted|resolved/.test(content)) lifecycleClaim = 'completed';
 
   const documentary = ['documents', 'google_drive'].includes(bundle.source);
   let evidenceType = documentary ? 'document' : bundle.source === 'notion' ? 'work_tracker_claim' : 'crm_record';
   let evidenceStrength = documentary ? 0.72 : bundle.source === 'notion' ? 0.48 : 0.35;
-  if (/acknowledgement|submission receipt|e-filing receipt|upload confirmation|service request receipt/.test(content)) { evidenceType = 'official_receipt'; evidenceStrength = 0.97; }
-  if (/draft|not submitted|otp pending|missing|do not submit/.test(content)) { evidenceType = 'negative_documentary_evidence'; evidenceStrength = documentary ? 0.95 : 0.72; }
-  if (/cancelled|client said stop/.test(content)) { evidenceType = 'cancellation_instruction'; evidenceStrength = 0.96; }
+  if (/confirmation|receipt|accepted|successfully/.test(content)) { evidenceType = 'official_receipt'; evidenceStrength = 0.97; }
+  if (/draft|not submitted|pending|waiting|not yet|do not submit/.test(content)) { evidenceType = 'negative_documentary_evidence'; evidenceStrength = documentary ? 0.95 : 0.72; }
+  if (/cancelled|stopped|withdrawn/.test(content)) { evidenceType = 'cancellation_instruction'; evidenceStrength = 0.96; }
   if (bundle.source === 'pipedrive' && bundle.notes?.length) { evidenceType = 'crm_note'; evidenceStrength = Math.max(evidenceStrength, 0.58); }
 
-  const ownerRaw = valueOf(custom, 'Legacy') || match(bundle.content, /(?:prepared by|filed by|handled by|submitted by|uploaded by|reviewed by):\s*([^\n,;]+)/i);
-  const explicitOwner = match(bundle.content, /(?:prepared by|filed by|handled by|submitted by|uploaded by):\s*([A-Za-z. ]+)/i);
+  const ownerRaw = valueOf(custom, 'Legacy')
+    || match(bundle.content, /(?:assigned to|owned by|handled by|responsible:|prepared by|filed by|submitted by|uploaded by|reviewed by|by)\s*([^\n,;]+)/i)
+    || match(bundle.content, /(?:for)\s+([A-Z][A-Za-z .'-]+)/i);
+  const explicitOwner = match(bundle.content, /(?:assigned to|owned by|responsible:|prepared by|filed by|handled by|submitted by|uploaded by)\s*([A-Za-z. ]+)/i);
   const reference = valueOf(custom, 'Ref')
-    || match(bundle.content, /(?:reference|acknowledgement|arn|srn|token):\s*([A-Za-z0-9-]+)/i);
+    || match(bundle.content, /(?:reference|token|id|number|case no|case number):\s*([A-Za-z0-9-]+)/i);
   const period = valueOf(custom, 'Cycle')
-    || match(bundle.content, /(?:period|quarter|assessment year|tax period):\s*([^\n,;]+)/i);
+    || match(bundle.content, /(?:period|quarter|semester|term|month|year|cycle):\s*([^\n,;]+)/i);
   const client = bundle.organization
-    || match(bundle.content, /(?:legal name|client|taxpayer|entity|party|deductor):\s*([^\n,;]+)/i);
+    || match(bundle.content, /(?:for|client|customer|organization|party|student|member|applicant|account)\s*[:\-]?\s*([^\n,;]+)/i);
   const dateRaw = match(bundle.content, /(?:submitted|filed|updated|execution date):\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4}|\d{1,2}[-/]\d{1,2}[-/]\d{4})/i);
   let eventDate = null;
   if (dateRaw) {
     const parsed = new Date(dateRaw);
     if (!Number.isNaN(parsed.getTime())) eventDate = parsed.toISOString().slice(0, 10);
   }
+  const objectType = topic === 'unknown' ? 'business_item' : `record_${topic}`;
   return Fact.parse({
     inputId: bundle.inputId,
-    objectType: topic === 'inventory_register' ? 'file_register' : topic === 'contract' ? 'contract' : 'filing_or_matter',
+    objectType,
     topic,
     client,
     ownerRaw,
