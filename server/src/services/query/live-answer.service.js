@@ -99,7 +99,7 @@ function topicMatches(truth, plan) {
 function broadCrmMatch(question, truth) {
   const q = String(question || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const text = `${truth.client || ''} ${truth.topic || ''} ${truth.reference || ''} ${truth.evidence?.map((item) => item?.text || '').join(' ') || ''}`.toLowerCase();
-  const crmTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses'];
+  const crmTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses', 'student', 'students', 'enrollment', 'enrollments', 'course', 'courses', 'semester', 'fee', 'fees'];
   const asksForCrm = crmTerms.some((term) => q.includes(term));
   if (!asksForCrm) return false;
   return crmTerms.some((term) => text.includes(term)) || truth.sources.includes('pipedrive');

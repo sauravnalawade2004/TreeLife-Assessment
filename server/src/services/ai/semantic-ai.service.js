@@ -137,9 +137,9 @@ export class SemanticAiService {
     }));
     const prompt = `You extract source-grounded business facts for a client-specific semantic layer.
 Return a JSON array with exactly one object per inputId. Never calculate counts and never invent missing data.
-Use snake_case topic names which describe the actual work, for example income_tax_filing, gst_filing, tds_return, corporate_filing_application, contract, inventory_register. You may create other topic names when evidence requires them.
+Use snake_case topic names which describe the actual work, for example student_enrollment, course_fee, support_ticket, contract, inventory_record, or any other topic that fits the evidence. You may create other topic names when evidence requires them.
 Official CRM statuses can be stale. Explicit notes and document contents override filenames and official status claims.
-lifecycleClaim must be completed, open, cancelled, or unknown. A draft/final filename alone is not completion. Acknowledgement, ARN/SRN, accepted token, or explicit successful submission is strong evidence. Negations such as NOT SUBMITTED and OTP pending are strong open evidence.
+lifecycleClaim must be completed, open, cancelled, or unknown. A draft/final filename alone is not completion. Clear completion language such as done, completed, confirmed, received, accepted, or successful submission is strong evidence. Negations such as not submitted, pending, waiting, or in progress are strong open evidence.
 ownerRaw preserves the exact alias/code. ownerCanonical is non-null only when a real full name is explicit. eventDate is YYYY-MM-DD or null. evidenceStrength is 0..1.
 Every output object must contain: inputId, objectType, topic, client, ownerRaw, ownerCanonical, lifecycleClaim, period, eventDate, reference, evidenceType, evidenceStrength, text, confidence.
 Inputs: ${JSON.stringify(inputs)}`;

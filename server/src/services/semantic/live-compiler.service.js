@@ -439,13 +439,12 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
     const evidenceText = `${fact.text || ''} ${(fact.rawEvidence?.notes || []).join(' ')} ${fact.rawEvidence?.title || ''}`.toLowerCase();
     if (/duplicate from old|same as first|do not use|don't use/.test(evidenceText)) {
       fact.lifecycleClaim = 'unknown'; fact.evidenceType = 'duplicate_record'; fact.evidenceStrength = 0.1;
-    } else if (/(arn|srn)\s+(received|confirmed)|acknowledgement.*(received|available)|token\s*[a-z0-9-]*.*accepted|successfully (filed|submitted)/.test(evidenceText) && !/not (received|submitted|available)|no (arn|srn|acknowledgement)/.test(evidenceText)) {
+    } else if (/(confirmed|received|accepted|successful|completed|resolved|submitted)/.test(evidenceText) && !/(not|no|missing|pending|waiting|in progress|draft)/.test(evidenceText)) {
       fact.lifecycleClaim = 'completed'; fact.evidenceStrength = Math.max(fact.evidenceStrength, 0.85);
     }
-    if (/(says|believes|team says).*filed.*(not found|missing)|filed but.*(not found|missing)|arn not found/.test(evidenceText)) {
+    if (/(says|believes|team says).*(not found|missing|unclear|conflicting)|but.*(not found|missing|unclear|conflicting)|not available/.test(evidenceText)) {
       fact.lifecycleClaim = 'unknown'; fact.evidenceType = 'unverified_completion_claim'; fact.evidenceStrength = Math.min(fact.evidenceStrength, 0.65);
     }
-    if (fact.topic === 'corporate_filing_application' && !/\bcfa\b|corporate|\bmca\b|\bsrn\b|\broc\b/.test(evidenceText)) fact.topic = 'unknown';
   }
   const groups = groupFactsForBusinessTruths(facts);
   const ownerIndex = canonicalOwners(groups);

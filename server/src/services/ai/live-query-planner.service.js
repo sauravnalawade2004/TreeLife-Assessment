@@ -110,7 +110,7 @@ function fallbackPlan(question, glossary = {}) {
       : /\bstatus|what.*happening|chal raha\b/.test(q) ? 'status'
         : /\bwas|is|did|verify\b/.test(q) ? 'verify'
           : /\bsummary|summarize\b/.test(q) ? 'summarize' : 'count';
-  const scope = /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|org|orgs|stage|stages|owner|owners|contact|contacts|account|accounts|client|clients|customer|customers|company|companies|business|businesses)\b/.test(q) ? 'crm_deals' : /\bfile|document|pdf\b/.test(q) && operation === 'locate' ? 'files' : /fil|return|itr|gst|tds|cfa|application/.test(q) ? 'filings' : 'business_items';
+  const scope = /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|org|orgs|stage|stages|owner|owners|contact|contacts|account|accounts|client|clients|customer|customers|company|companies|business|businesses)\b/.test(q) ? 'crm_deals' : /\bfile|document|pdf\b/.test(q) && operation === 'locate' ? 'files' : /\b(?:fil|return|itr|gst|tds|cfa|application|student|students|enrollment|enrollments|course|courses|fee|fees|semester|member|case)\b/.test(q) ? 'filings' : 'business_items';
   const topicPatterns = [
     ['income_tax_filing', /income tax|\bitr\b|it return/],
     ['gst_filing', /\bgst\b|gstr|3b/],
