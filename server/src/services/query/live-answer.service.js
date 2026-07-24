@@ -96,13 +96,24 @@ function topicMatches(truth, plan) {
   return true;
 }
 
+function isGenericCrmQuestion(question) {
+  const q = String(question || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const genericWords = ['how', 'many', 'much', 'of', 'the', 'a', 'an', 'and', 'or', 'in', 'our', 'we', 'you', 'are', 'is', 'there', 'there', 'what', 'show', 'list', 'give', 'me', 'total', 'overall', 'count', 'all', 'for', 'have', 'has', 'to', 'on', 'by', 'with'];
+  const generic = q.replace(/\b(?:how many|how much|how many of|what is the|what are the|what are|total|overall|count|number of|show me|list|give me|all of|any of|where is|where are|status of|how many have|how many were|how many are|there are|there is|are there)\b/g, '')
+    .replace(/\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|stage|stages|owner|owners|account|accounts|client|clients|customer|customers|company|companies|business|businesses)\b/g, '')
+    .split(/\s+/).filter(Boolean);
+  return generic.every((token) => genericWords.includes(token));
+}
+
 function broadCrmMatch(question, truth) {
   const q = String(question || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const text = `${truth.client || ''} ${truth.topic || ''} ${truth.reference || ''} ${truth.evidence?.map((item) => item?.text || '').join(' ') || ''}`.toLowerCase();
-  const crmTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses', 'student', 'students', 'enrollment', 'enrollments', 'course', 'courses', 'semester', 'fee', 'fees'];
-  const asksForCrm = crmTerms.some((term) => q.includes(term));
-  if (!asksForCrm) return false;
-  return crmTerms.some((term) => text.includes(term)) || truth.sources.includes('pipedrive');
+  const crmTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses'];
+  if (!crmTerms.some((term) => q.includes(term))) return false;
+  if (!isGenericCrmQuestion(question)) {
+    return text.includes('deal') || text.includes('lead') || text.includes('opportunity') || text.includes('prospect') || text.includes('pipeline') || text.includes('organization');
+  }
+  return truth.sources.includes('pipedrive');
 }
 
 function coverage(tenant, checkedSources) {
@@ -153,7 +164,7 @@ export class LiveAnswerService {
     });
     const matched = scopedCandidates.filter((truth) => !plan.state || truth.state === plan.state);
     const unresolved = scopedCandidates.filter((truth) => truth.state === 'unknown' || truth.conflict);
-    const broadCount = plan.operation === 'count' && !plan.topic && crmTermRegex.test(String(question || '').toLowerCase());
+    const broadCount = plan.operation === 'count' && !plan.topic && crmTermRegex.test(String(question || '').toLowerCase()) && isGenericCrmQuestion(question);
     const countCandidates = broadCount ? truths.filter((truth) => truth.sources.includes('pipedrive') && inRange(truth, plan.timeRange)) : [];
     const allHealthy = sourceCoverage.filter((item) => item.status === 'checked').every((item) => ['healthy', 'demo'].includes(item.health));
     let status = 'ANSWERED', answer = null;

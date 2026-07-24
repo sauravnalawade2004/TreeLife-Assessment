@@ -49,12 +49,23 @@ function extractTimeRange(question) {
   return 'all';
 }
 
+function isGenericCrmQuestion(question) {
+  const q = String(question || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!crmTermRegex.test(q)) return false;
+  const genericTokens = q.replace(/\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|org|orgs|stage|stages|owner|owners|contact|contacts|account|accounts|client|clients|customer|customers|company|companies|business|businesses)\b/g, '')
+    .replace(/\b(?:how many|how much|how many of|what is the|what are the|what are|total|overall|count|number of|show me|list|give me|all of|any of|where is|where are|status of|how many have|how many were|how many are)\b/g, '')
+    .split(/\s+/).filter(Boolean);
+  if (!genericTokens.length) return true;
+  const allowedGeneric = new Set(['how','many','much','of','the','a','an','and','or','in','our','we','you','are','is','there','what','show','list','give','me','total','overall','count','all','for','have','has','to','on','by','with','status','where','are','how','many','were','have','been','current','open','closed','pending','completed','active']);
+  return genericTokens.every((token) => allowedGeneric.has(token));
+}
+
 function broadlyScopedQuestion(question, plan) {
   const q = question.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  if (plan.scope === 'crm_deals') return broadBusinessQuery.test(q) && crmTermRegex.test(q);
+  if (plan.scope === 'crm_deals') return broadBusinessQuery.test(q) && isGenericCrmQuestion(question);
   if (plan.scope === 'filings') return /\b(?:how many|how much|list|show|all|total|overall)\b.*\b(?:filings?|returns?|applications?)\b/.test(q)
     || /\b(?:all|total|overall)\s+(?:filings?|returns?|applications?)\b/.test(q);
-  if (plan.scope === 'business_items') return broadBusinessQuery.test(q) && crmTermRegex.test(q)
+  if (plan.scope === 'business_items') return broadBusinessQuery.test(q) && isGenericCrmQuestion(question)
     || /\b(?:all|total|overall)\b.*\b(?:work|matters?|cases?|business items?|records?|tasks?)\b/.test(q);
   return false;
 }
@@ -63,7 +74,7 @@ function enoughBroadTenantSignal(question, plan) {
   const q = question.toLowerCase();
   const countWords = broadBusinessQuery.test(q);
   const orgWords = crmTermRegex.test(q);
-  return countWords && orgWords && ['crm_deals','business_items'].includes(plan.scope);
+  return countWords && orgWords && ['crm_deals','business_items'].includes(plan.scope) && isGenericCrmQuestion(question);
 }
 
 function topicMatchesQuestion(question, topic) {
