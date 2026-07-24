@@ -3,14 +3,6 @@ import { Activity, ArrowUp, BrainCircuit, CheckCircle2, ChevronDown, Database, F
 import './live-ui.css';
 
 const API ='https://treelife-assessment.onrender.com/api';
-const samples = [
-  'How many income tax filings have we completed?',
-  'How many income tax matters are open?',
-  'Where is the latest inventory file?',
-  'How many CFA matters are open?',
-  'Is Cedar Works income tax return filed?',
-  'How many GST filings did Garima complete?'
-];
 const statusMeta = {
   ANSWERED: ['Verified answer', 'good', CheckCircle2],
   VERIFIED_ZERO: ['Verified zero', 'good', ShieldCheck],
@@ -29,7 +21,7 @@ async function api(path, options) {
 function App() {
   const [tenants, setTenants] = useState([]);
   const [tenant, setTenant] = useState('acme-law');
-  const [question, setQuestion] = useState(samples[0]);
+  const [question, setQuestion] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState('ask');
@@ -80,7 +72,6 @@ function AskView({ question, setQuestion, ask, loading, result }) {
       {loading && <div className="loading"><BrainCircuit /><span>Understanding the question, retrieving evidence, and verifying the answer…</span></div>}
       {result && <Result result={result} />}
     </section>
-    <div className="samples">{samples.map((sample) => <button key={sample} onClick={() => { setQuestion(sample); ask(sample); }}>{sample}</button>)}</div>
   </div>;
 }
 
