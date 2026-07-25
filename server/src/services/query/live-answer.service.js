@@ -145,6 +145,24 @@ export class LiveAnswerService {
       };
     }
     const candidates = truths.filter((truth) => topicMatches(truth, plan));
+    if (plan.person && candidates.length > 0) {
+      console.log(`[DEBUG] Person filter: looking for plan.person = "${plan.person}"`);
+      candidates.slice(0, 5).forEach((truth, idx) => {
+        console.log(`  Candidate ${idx}: truthId=${truth.truthId}, owners=${JSON.stringify(truth.owners || [])}, ownerAliases=${JSON.stringify(truth.ownerAliases || [])}`);
+        if (truth.owners) truth.owners.forEach((owner) => console.log(`    - owner "${owner}" fuzzyMatch result: ${fuzzyMatch(owner, plan.person)}`));
+        if (truth.ownerAliases) truth.ownerAliases.forEach((alias) => console.log(`    - alias "${alias}" fuzzyMatch result: ${fuzzyMatch(alias, plan.person)}`));
+      });
+    }
+    const debugInfo = plan.person && candidates.length > 0 ? {
+      searchingForPerson: plan.person,
+      candidateSample: candidates.slice(0, 5).map((truth) => ({
+        truthId: truth.truthId,
+        owners: truth.owners || [],
+        ownerAliases: truth.ownerAliases || [],
+        ownersMatchTest: (truth.owners || []).map((owner) => ({ owner, fuzzyMatchResult: fuzzyMatch(owner, plan.person) })),
+        aliasesMatchTest: (truth.ownerAliases || []).map((alias) => ({ alias, fuzzyMatchResult: fuzzyMatch(alias, plan.person) }))
+      }))
+    } : null;
     const scopedCandidates = candidates.filter((truth) => {
       if (plan.person && ![...(truth.owners || []), ...(truth.ownerAliases || [])].some((owner) => fuzzyMatch(owner, plan.person))) return false;
       if (plan.client && !fuzzyMatch(truth.client, plan.client)) return false;
@@ -209,7 +227,8 @@ export class LiveAnswerService {
         sourceCoverage,
         records: evidenceItems.map((truth) => ({ truthId: truth.truthId, client: truth.client, topic: truth.topic, state: truth.state, reference: truth.reference, confidence: truth.confidence, sources: truth.sources, bestPath: truth.bestPath, bestUrl: truth.bestUrl })),
         sourceEvidence: matchedFacts,
-        unresolvedExcluded: unresolvedExcluded.map((truth) => truth.truthId)
+        unresolvedExcluded: unresolvedExcluded.map((truth) => truth.truthId),
+        debugPersonFilter: debugInfo
       },
       reasoning: [
         `Used live semantic map version ${semanticMap.version}; query topic resolved to ${plan.topic || plan.scope}.`,
