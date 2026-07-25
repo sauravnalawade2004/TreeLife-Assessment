@@ -28,11 +28,16 @@ function profileFields(records) {
 }
 
 function scoreField(profile, hints, lifecycle = false) {
-  let score = Math.max(...hints.map(h => similarity(profile.name, h)), 0);
+  const hintScore = Math.max(...hints.map(h => similarity(profile.name, h)), 0);
+  let score = hintScore;
   if (lifecycle) {
     const hits = profile.samples.filter(v => [...DEAD, ...OPEN, 'done','closed','submitted','filed'].some(x => v.includes(x))).length;
     score += Math.min(.45, hits * .12);
-  } else if (profile.distinctRatio > .15 && profile.distinctRatio < .9 && profile.samples.every(v => v.length < 40)) score += .12;
+  } else {
+    if (profile.distinctRatio > .15 && profile.distinctRatio < .9 && profile.samples.every(v => v.length < 40)) score += .12;
+    // Strong name hints should decisively favor owner if the field label clearly matches owner terminology.
+    if (hintScore >= 0.3) score += 0.22;
+  }
   // A generic textbook owner with one shared value is weaker than a populated
   // custom business field. A specific custom label wins an otherwise tied score.
   if (!lifecycle && profile.distinctRatio <= .2) score -= .35;
