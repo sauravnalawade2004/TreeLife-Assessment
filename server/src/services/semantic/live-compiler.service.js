@@ -127,7 +127,14 @@ function buildBundles(records) {
     const dealId = String(deal.fields.raw?.id ?? deal.id.replace('deal:', ''));
     const organization = organizations.get(String(deal.fields.organization_id ?? deal.fields.raw?.org_id ?? '')) || null;
     const notes = notesByDeal.get(dealId) || [];
-    const customFields = deal.fields.custom_fields || {};
+    const rawFields = Object.entries(deal.fields)
+      .filter(([key]) => key !== 'custom_fields' && key !== 'raw' && key !== 'notes')
+      .reduce((acc, [name, value]) => {
+        if (value === undefined || value === null || value === '') return acc;
+        const fieldValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        return { ...acc, [name]: { value: fieldValue } };
+      }, {});
+    const customFields = { ...rawFields, ...(deal.fields.custom_fields || {}) };
     const customText = Object.entries(customFields).map(([name, item]) => `${name}: ${item?.value ?? item}`).join('; ');
     const rawSummary = Object.entries(deal.fields.raw || {})
       .filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -430,6 +437,7 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
   const ownerField = roleField('owner', 0.6);
   const referenceField = roleField('reference', 0.7);
   const periodField = roleField('period', 0.7);
+  console.log('[DEBUG] Field hypotheses:', JSON.stringify(fieldHypotheses, null, 2));
   for (const fact of facts) {
     const custom = fact.rawEvidence?.customFields || {};
     const observed = (field) => custom?.[field]?.value ?? custom?.[field] ?? null;
