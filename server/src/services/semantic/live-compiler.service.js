@@ -12,6 +12,21 @@ const stripCompanySuffixes = (value) => String(value ?? '').toLowerCase()
   .replace(/\b(private|pvt|limited|ltd|llp|inc|corp|corporation|services|traders)\b/g, ' ')
   .replace(/[^a-z0-9]/g, '');
 
+const OWNER_FIELD_HINTS = ['deal owner', 'lead owner', 'assigned to', 'assignee', 'responsible', 'handled by', 'handler', 'relationship manager', 'case handler', 'owner'];
+
+function fieldHintScore(fieldName, hints) {
+  const normalized = String(fieldName ?? '').trim().toLowerCase();
+  if (hints.some((hint) => normalized.includes(String(hint).toLowerCase()))) return 1;
+  const words = [...new Set(normalized.replace(/[_]+/g, ' ').match(/[a-z0-9]+/g) || [])];
+  if (!words.length) return 0;
+  return Math.max(...hints.map((hint) => {
+    const hintWords = [...new Set(String(hint).toLowerCase().replace(/[_]+/g, ' ').match(/[a-z0-9]+/g) || [])];
+    if (!hintWords.length) return 0;
+    const intersection = words.filter((word) => hintWords.includes(word)).length;
+    return intersection / new Set([...words, ...hintWords]).size;
+  }));
+}
+
 function similarity(a, b) {
   const left = stripCompanySuffixes(a), right = stripCompanySuffixes(b);
   if (!left || !right) return 0;
@@ -358,6 +373,8 @@ function profileCustomFields(bundles, facts) {
     const ownerScore = ratio((fact, value) => normalize(fact?.ownerRaw) === normalize(value));
     const referenceScore = ratio((fact, value) => normalize(fact?.reference) === normalize(value));
     const periodScore = ratio((fact, value) => normalize(fact?.period) === normalize(value));
+    const ownerFieldHintScore = fieldHintScore(name, OWNER_FIELD_HINTS);
+    const boostedOwnerScore = ownerFieldHintScore > 0 ? Math.max(ownerScore, Math.min(1, ownerFieldHintScore * 0.95 + 0.05)) : ownerScore;
     const stateByValue = new Map();
     for (const { bundle, value } of rows) {
       const state = factById.get(bundle.sourceRecordId)?.lifecycleClaim || 'unknown';
@@ -373,7 +390,12 @@ function profileCustomFields(bundles, facts) {
     const lifecycleScore = rows.length && repeatedRows
       ? (repeatedRows / rows.length) * (consistentRepeatedRows / repeatedRows)
       : 0;
-    const scores = { owner: ownerScore, reference: referenceScore, period: periodScore, lifecycle_code: lifecycleScore };
+    const scores = {
+      owner: boostedOwnerScore,
+      reference: referenceScore,
+      period: periodScore,
+      lifecycle_code: ownerFieldHintScore >= 0.8 ? lifecycleScore * 0.65 : lifecycleScore
+    };
     const [role, score] = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
     return {
       field: name,

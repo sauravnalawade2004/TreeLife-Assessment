@@ -1,7 +1,7 @@
 const clean = value => String(value ?? '').trim().toLowerCase();
 const words = value => new Set(clean(value).replaceAll('_', ' ').match(/[a-z0-9]+/g) || []);
 
-const OWNER_HINTS = ['owner','assigned to','assignee','pic','relationship manager','case handler','responsible'];
+const OWNER_HINTS = ['deal owner','lead owner','owner','assigned to','assignee','responsible','handled by','handler','relationship manager','case handler'];
 const STATUS_HINTS = ['status','state','stage','workflow state','board column','folder'];
 const DEAD = ['dead','lost','rejected','archive','cancelled','void'];
 const OPEN = ['open','active','doing','follow up','qualified','proposal','discovery','negotiation','review'];
@@ -11,6 +11,12 @@ function similarity(a, b) {
   if (!A.size || !B.size) return 0;
   if (clean(a) === clean(b)) return 1;
   return intersection / new Set([...A, ...B]).size;
+}
+
+function hintScore(name, hints) {
+  const normalized = clean(name);
+  if (hints.some((hint) => normalized.includes(clean(hint)))) return 1;
+  return Math.max(...hints.map((hint) => similarity(name, hint)), 0);
 }
 
 function profileFields(records) {
@@ -28,8 +34,8 @@ function profileFields(records) {
 }
 
 function scoreField(profile, hints, lifecycle = false) {
-  const hintScore = Math.max(...hints.map(h => similarity(profile.name, h)), 0);
-  let score = hintScore;
+  const nameHintScore = hintScore(profile.name, hints);
+  let score = nameHintScore;
   if (lifecycle) {
     const hits = profile.samples.filter(v => [...DEAD, ...OPEN, 'done','closed','submitted','filed'].some(x => v.includes(x))).length;
     score += Math.min(.45, hits * .12);
