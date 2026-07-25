@@ -96,6 +96,16 @@ test('status evidence follows the selected actual item without changing numeric 
     assert.equal(julyResult.status, 'ANSWERED');
     assert.equal(julyResult.answer.value, 1);
     assert.deepEqual(julyResult.evidence.matchedRecordIds, ['july-truth']);
+
+    truths = [
+      truth({ truthId: 'education-false-match', topic: 'income_tax_filing', client: 'Cedar Works', conflict: false, sourceRecordIds: ['deal:9'], evidence: [{ factId: 'education-text', source: 'pipedrive', sourceRecordId: 'deal:9', claim: 'open', text: 'This deal mentions education in the notes but is not an education record.' }] }),
+      truth({ truthId: 'education-true-match', topic: 'education_deal', client: 'Northview College', state: 'open', conflict: false, sourceRecordIds: ['deal:10'], sources: ['pipedrive'], evidence: [{ factId: 'education-true', source: 'pipedrive', sourceRecordId: 'deal:10', claim: 'open', text: 'Education enrollment record.' }] })
+    ];
+    plan = { ...basePlan, operation: 'count', client: null, topic: 'education_deal', state: null, scope: 'crm_deals' };
+    const educationTopicResult = await service.answer('acme-law', 'How many education deals are there?');
+    assert.equal(educationTopicResult.status, 'ANSWERED');
+    assert.equal(educationTopicResult.answer.value, 1);
+    assert.deepEqual(educationTopicResult.evidence.matchedRecordIds, ['education-true-match']);
   } finally {
     BusinessTruthModel.find = originals.businessFind;
     SemanticMapModel.findOne = originals.mapFindOne;

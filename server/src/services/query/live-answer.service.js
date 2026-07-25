@@ -105,17 +105,6 @@ function isGenericCrmQuestion(question) {
   return generic.every((token) => genericWords.includes(token));
 }
 
-function broadCrmMatch(question, truth) {
-  const q = String(question || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  const text = `${truth.client || ''} ${truth.topic || ''} ${truth.reference || ''} ${truth.evidence?.map((item) => item?.text || '').join(' ') || ''}`.toLowerCase();
-  const crmTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses'];
-  if (!crmTerms.some((term) => q.includes(term))) return false;
-  if (!isGenericCrmQuestion(question)) {
-    return text.includes('deal') || text.includes('lead') || text.includes('opportunity') || text.includes('prospect') || text.includes('pipeline') || text.includes('organization');
-  }
-  return truth.sources.includes('pipedrive');
-}
-
 function coverage(tenant, checkedSources) {
   return activeConnectors(tenant?.connectors || []).map((connector) => ({
     source: connector.type,
@@ -155,7 +144,7 @@ export class LiveAnswerService {
         reasoning: ['The planner found a genuine business-language ambiguity and stopped before executing a calculation.']
       };
     }
-    const candidates = truths.filter((truth) => topicMatches(truth, plan) || broadCrmMatch(question, truth));
+    const candidates = truths.filter((truth) => topicMatches(truth, plan));
     const scopedCandidates = candidates.filter((truth) => {
       if (plan.person && ![...(truth.owners || []), ...(truth.ownerAliases || [])].some((owner) => fuzzyMatch(owner, plan.person))) return false;
       if (plan.client && !fuzzyMatch(truth.client, plan.client)) return false;
