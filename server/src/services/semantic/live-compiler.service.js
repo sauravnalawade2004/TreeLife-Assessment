@@ -118,7 +118,7 @@ function levenshtein(a, b) {
 function ownerSimilarity(alias, canonical) {
   const a = normalize(alias), c = normalize(canonical);
   if (!a || !c) return 0;
-  if (a === c || c.includes(a) || a.includes(c)) return 1;
+  if (a === c) return 1;
   const first = normalize(String(canonical).split(/\s+/)[0]);
   const words = String(canonical).split(/\s+/).filter(Boolean);
   const initials = words.map((word) => normalize(word)[0]).join('');
@@ -259,13 +259,15 @@ function chooseTopic(group) {
 
 function canonicalOwners(groups) {
   const rawExplicit = distinct(groups.flatMap((group) => group.map((fact) => fact.ownerCanonical).filter(Boolean)));
+  const rawFromRaw = distinct(groups.flatMap((group) => group.map((fact) => fact.ownerRaw).filter(Boolean)));
+  const allCandidates = distinct([...rawExplicit, ...rawFromRaw]);
   const completeness = (name) => {
     const words = String(name).split(/\s+/).filter(Boolean);
     return (words.length > 1 ? 2 : 0) + (normalize(words[0]).length > 2 ? 2 : 0) + String(name).length / 100;
   };
   const canonicalMap = new Map();
-  const ranked = [...rawExplicit].sort((a, b) => completeness(b) - completeness(a));
-  for (const name of rawExplicit) {
+  const ranked = [...allCandidates].sort((a, b) => completeness(b) - completeness(a));
+  for (const name of allCandidates) {
     const better = ranked.find((candidate) => completeness(candidate) >= completeness(name) && ownerSimilarity(name, candidate) >= 0.85);
     canonicalMap.set(name, better || name);
   }
@@ -273,7 +275,9 @@ function canonicalOwners(groups) {
   const aliasMap = new Map();
   for (const group of groups) {
     const localCanonical = group.map((fact) => fact.ownerCanonical).find(Boolean);
-    if (localCanonical) group.map((fact) => fact.ownerRaw).filter(Boolean).forEach((alias) => aliasMap.set(normalize(alias), canonicalMap.get(localCanonical) || localCanonical));
+    const localRaw = group.map((fact) => fact.ownerRaw).filter(Boolean);
+    const canonical = canonicalMap.get(localCanonical) || localCanonical || localRaw[0];
+    if (canonical) localRaw.forEach((alias) => aliasMap.set(normalize(alias), canonical));
   }
   for (const [name, canonical] of canonicalMap) aliasMap.set(normalize(name), canonical);
   return { explicit, aliasMap };
