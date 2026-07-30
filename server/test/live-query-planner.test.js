@@ -96,6 +96,18 @@ test('accepts direct CRM topic-only queries for leads and deals', () => {
   assert.equal(dealPlan.supportedByTenant, true);
 });
 
+test('does not narrow generic deal questions to a tenant-specific topic', () => {
+  const generic = guardPlanForTenant('total deals owned by Garima', {
+    ...base, scope: 'crm_deals', topic: 'transaction_deals', person: 'Garima Sharma', expandedTerms: ['transaction_deals']
+  }, { ...glossary, topics: [...glossary.topics, 'transaction_deals'] });
+  const explicit = guardPlanForTenant('total GST deals owned by Garima', {
+    ...base, scope: 'crm_deals', topic: 'gst_filing', person: 'Garima Sharma', expandedTerms: ['gst_filing']
+  }, glossary);
+  assert.equal(generic.topic, null);
+  assert.deepEqual(generic.expandedTerms, []);
+  assert.equal(explicit.topic, 'gst_filing');
+});
+
 test('extracts explicit month and year ranges from plain language', async () => {
   const service = new (await import('../src/services/ai/live-query-planner.service.js')).LiveQueryPlannerService();
   const result = await service.plan('How many deals were open in July 2026?', { glossary: { topics: [], people: {}, clients: [] } });

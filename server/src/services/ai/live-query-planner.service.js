@@ -127,8 +127,31 @@ function topicMatchesQuestion(question, topic) {
   });
 }
 
+const genericTopicTerms = new Set([
+  ...crmEntityTerms.map((term) => term.replace(/s$/u, '')),
+  'transaction', 'filing', 'return', 'application', 'work', 'matter', 'task'
+]);
+
+function hasExplicitTopicSubject(question, topic) {
+  const questionTerms = new Set(String(question || '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter(Boolean).map((term) => term.replace(/s$/u, '')));
+  const topicSubjects = String(topic || '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter(Boolean)
+    .map((term) => term.replace(/s$/u, ''))
+    .filter((term) => !genericTopicTerms.has(term));
+  return topicSubjects.some((term) => questionTerms.has(term));
+}
+
+function removeImplicitGenericCrmTopic(question, plan) {
+  const asksAboutDeals = /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines)\b/i.test(question);
+  if (plan.scope !== 'crm_deals' || !asksAboutDeals || !plan.topic || hasExplicitTopicSubject(question, plan.topic)) return plan;
+  // "deals" describes the search scope, not a tenant-specific topic such as
+  // transaction_deals. Keep every CRM deal eligible unless a subject is named.
+  return { ...plan, topic: null, expandedTerms: [] };
+}
+
 export function guardPlanForTenant(question, inputPlan, glossary = {}) {
-  const plan = Plan.parse(inputPlan);
+  const plan = removeImplicitGenericCrmTopic(question, Plan.parse(inputPlan));
   const topics = (glossary.topics || []).map(normalize);
   const people = Object.entries(glossary.people || {}).flatMap(([person, aliases]) => [person, ...(aliases || [])]).map(normalize);
   const clients = (glossary.clients || []).map(normalize);
@@ -232,7 +255,7 @@ Use operation=verify only for yes/no checks about a specific claim or state (was
 Allowed scope: crm_deals,filings,files,business_items.
 Allowed state: completed,open,cancelled,unknown or null.
 Allowed timeRange: all,last_month,this_month,this_year,last_year,YYYY,YYYY-MM.
-Map user terminology to one available topic when supported by the glossary. Use expandedTerms for synonyms and abbreviations. "Filed/filled/done/submitted" means completed. "Open/pending/chal raha" means open.
+Only set topic when the question explicitly names a subject/category, such as GST, contract, or income tax. Generic CRM nouns such as deal(s), lead(s), opportunity, or pipeline define scope only: use scope=crm_deals and topic=null for them. Use expandedTerms for synonyms and abbreviations. "Filed/filled/done/submitted" means completed. "Open/pending/chal raha" means open.
 If a term is genuinely ambiguous (for example closed could include completed and cancelled), set requiresClarification and provide one short clarification. Do not invent a client or person.
 Set supportedByTenant=false and requiresClarification=true when the question is unrelated to the connected business data or its subject cannot be mapped to the tenant glossary. Never map an unrelated general-knowledge question to business_items.
 Tenant glossary: ${JSON.stringify({ topics: glossary.topics || [], people: glossary.people || {}, clients: glossary.clients || [] })}
