@@ -13,7 +13,7 @@ const stripCompanySuffixes = (value) => String(value ?? '').toLowerCase()
   .replace(/\b(private|pvt|limited|ltd|llp|inc|corp|corporation|services|traders)\b/g, ' ')
   .replace(/[^a-z0-9]/g, '');
 
-const OWNER_FIELD_HINTS = ['deal owner', 'lead owner', 'assigned to', 'assignee', 'responsible', 'handled by', 'handler', 'relationship manager', 'case handler', 'owner'];
+const OWNER_FIELD_HINTS = ['deal owner', 'lead owner', 'assigned to', 'assignee', 'responsible', 'handled by', 'handler', 'relationship manager', 'case handler', 'owner', 'user', 'username', 'user name', 'person', 'person name', 'contact', 'handler name', 'assignee name', 'owner name'];
 
 function cleanOwnerLabel(name) {
   return String(name || '')
@@ -498,7 +498,10 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
   console.log('[DEBUG] Field hypotheses:', JSON.stringify(fieldHypotheses, null, 2));
   for (const fact of facts) {
     const custom = fact.rawEvidence?.customFields || {};
-    const observed = (field) => custom?.[field]?.value ?? custom?.[field] ?? null;
+    const observed = (field) => {
+      const match = Object.keys(custom).find((key) => key.toLowerCase() === String(field).toLowerCase());
+      return match ? (custom[match]?.value ?? custom[match] ?? null) : null;
+    };
     if (ownerField && observed(ownerField)) fact.ownerRaw = String(observed(ownerField));
     if (referenceField && observed(referenceField)) fact.reference = String(observed(referenceField));
     if (periodField && observed(periodField)) fact.period = String(observed(periodField));

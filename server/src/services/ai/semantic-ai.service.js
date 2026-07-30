@@ -65,7 +65,8 @@ function fallbackFact(bundle) {
    const ownerRaw = valueOf(custom, 'Legacy')
       || match(bundle.content, /(?:assigned to|owned by|handled by|responsible:|prepared by|filed by|submitted by|uploaded by|reviewed by|by)\s+([A-Z][A-Za-z]+ (?:[A-Za-z ]+)?)\s+(?:ARN:|Status:|for|and|acknowledged\s+by\s+prepared|prepared\s+by)/i)
       || match(bundle.content, /(?:assigned to|owned by|handled by|responsible:|prepared by|filed by|submitted by|uploaded by)\s+([A-Za-z.]+?)\s*(?:ARN:|Status:|for|and)/i)
-      || match(bundle.content, /(?:for)\s+([A-Z][A-Za-z]+ (?:[A-Za-z ]+)?)/i);
+      || match(bundle.content, /(?:for)\s+([A-Z][A-Za-z]+ (?:[A-Za-z ]+)?)/i)
+      || match(bundle.content, /(?:^|\n)(?:owner|assigned\s*(?:to|user)|responsible|handler)\s*[:=]\s*([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)/im);
     const explicitOwner = match(bundle.content, /(?:assigned to|owned by|responsible:|prepared by|filed by|handled by|submitted by|uploaded by)\s+([A-Z][a-z]+ (?:[A-Za-z]{2,20}(?: [A-Za-z]{2,20})?)?)\s*(?:ARN:|Status:|for|and|and\s+the|\s+and|;|\s+\d+)/i);
   const reference = valueOf(custom, 'Ref')
     || match(bundle.content, /(?:reference|token|id|number|case no|case number):\s*([A-Za-z0-9-]+)/i);
