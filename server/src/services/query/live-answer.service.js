@@ -183,21 +183,23 @@ export class LiveAnswerService {
       if (!inRange(truth, plan.timeRange)) return false;
       return true;
     });
-    const groupedCandidates = plan.groupByClient && plan.requireNoMatchingInGroup
+    const groupedCandidates = plan.groupByClient
       ? [...scopedCandidates.reduce((groups, truth) => {
         const key = truth.client || truth.reference || truth.truthId;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(truth);
         return groups;
       }, new Map()).values()]
-        .filter((group) => !group.some((truth) => {
-          const personMatches = matchesPerson(truth);
-          const stateMatches = !plan.state || truth.state === plan.state;
-          return personMatches && stateMatches;
-        }))
+        .filter(plan.requireNoMatchingInGroup
+          ? (group) => !group.some((truth) => {
+            const personMatches = matchesPerson(truth);
+            const stateMatches = !plan.state || truth.state === plan.state;
+            return personMatches && stateMatches;
+          })
+          : () => true)
         .map((group) => group[0])
       : scopedCandidates;
-    const matched = plan.groupByClient && plan.requireNoMatchingInGroup
+    const matched = plan.requireNoMatchingInGroup
       ? groupedCandidates
       : groupedCandidates.filter(matchesState);
     const unresolved = groupedCandidates.filter((truth) => truth.state === 'unknown' || truth.conflict);

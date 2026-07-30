@@ -185,6 +185,13 @@ test('executes Gemini-provided negated filters and organization absence groups',
       assert.equal(result.answer.value, 1);
       assert.deepEqual(result.evidence.matchedRecordIds, ['priya-completed']);
     }
+
+    plan = { ...basePlan, operation: 'count', scope: 'crm_deals', topic: null, person: null, client: null, state: null, groupByClient: true, requireNoMatchingInGroup: false };
+    for (const question of ['how many organizations are there', 'total organizations', 'count of distinct clients']) {
+      const result = await service.answer('acme-law', question);
+      assert.equal(result.status, 'ANSWERED');
+      assert.equal(result.answer.value, 2);
+    }
   } finally {
     BusinessTruthModel.find = originals.businessFind;
     SemanticMapModel.findOne = originals.mapFindOne;
