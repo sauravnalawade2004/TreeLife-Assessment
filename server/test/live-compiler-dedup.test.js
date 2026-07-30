@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { groupFactsForBusinessTruths } from '../src/services/semantic/live-compiler.service.js';
+import { groupFactsForBusinessTruths, isPlausibleOwnerName } from '../src/services/semantic/live-compiler.service.js';
 
 const fact = (overrides) => ({
   source: 'pipedrive', sourceRecordId: 'record', topic: 'income_tax_filing',
@@ -27,4 +27,9 @@ test('normalizes equivalent month formats but keeps different periods separate',
   ]);
   assert.equal(groups.length, 2);
   assert.deepEqual(groups.map((group) => group.length).sort(), [1, 2]);
+});
+
+test('owner validation accepts names only and rejects document-derived text', () => {
+  for (const valid of ['Garima Sharma', 'K. Sharma', 'A B C D']) assert.equal(isPlausibleOwnerName(valid), true);
+  for (const invalid of ['ARN: 29871', 'Status Open', 'Synthetic document', 'Garima-Owner', 'Garima 2', 'garima Sharma', 'A B C D E']) assert.equal(isPlausibleOwnerName(invalid), false);
 });

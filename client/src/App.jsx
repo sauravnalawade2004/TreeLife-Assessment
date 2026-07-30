@@ -122,17 +122,13 @@ function Sources({ tenant, tenantId, onRefresh }) {
   const [notice, setNotice] = useState('');
   const liveConnectors = useMemo(() => {
     const connectors = tenant?.connectors || [];
-    let live = connectors.filter((connector) => ['pipedrive-acme', 'documents-acme', 'google-drive-acme', 'notion-acme'].includes(connector.id));
-    if (live.some((connector) => connector.id === 'google-drive-acme')) live = live.filter((connector) => connector.id !== 'documents-acme');
-    else live.push({ id: 'google-drive-acme', type: 'google_drive', name: 'Google Drive Evidence', status: 'not configured', recordCount: 0, lastSync: null });
-    if (!live.some((connector) => connector.id === 'notion-acme')) live.push({ id: 'notion-acme', type: 'work_tracker', name: 'Notion Work Tracker', status: 'not configured', recordCount: 0, lastSync: null });
-    return live.length ? live : connectors;
+    return connectors.filter((connector) => connector.id === 'pipedrive-acme' || connector.type === 'crm');
   }, [tenant]);
   async function sync(connector) {
     setSyncing(connector.id);
     setNotice('');
     try {
-      const endpoints = { 'pipedrive-acme': '/connectors/pipedrive/sync', 'documents-acme': '/connectors/documents/sync', 'google-drive-acme': '/connectors/google-drive/sync', 'notion-acme': '/connectors/notion/sync' };
+      const endpoints = { 'pipedrive-acme': '/connectors/pipedrive/sync' };
       const endpoint = endpoints[connector.id];
       if (!endpoint) throw new Error(`No sync route exists for ${connector.name}`);
       await api(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tenantId }) });
@@ -143,10 +139,10 @@ function Sources({ tenant, tenantId, onRefresh }) {
     finally { setSyncing(''); }
   }
   return <div className="page">
-    <header><div><p className="eyebrow">LIVE CONNECTOR HEALTH</p><h1>Connected sources</h1><p>CRM, work-tracker, and document platforms feed one normalized evidence layer.</p></div></header>
+    <header><div><p className="eyebrow">LIVE CONNECTOR HEALTH</p><h1>Connected sources</h1><p>Pipedrive is the only active source in this CRM-only deployment.</p></div></header>
     {notice && <div className="sync-notice">{notice}</div>}
     <div className="source-cards">{liveConnectors.map((connector) => <section key={connector.id}><div className="source-icon"><Database /></div><div><h3>{connector.name}</h3><p>{connector.type.toUpperCase()} · {connector.recordCount} indexed records</p><span className="health"><i></i>{connector.status} · last synced {connector.lastSync ? new Date(connector.lastSync).toLocaleString() : 'not yet'}</span></div><button disabled={Boolean(syncing)} onClick={() => sync(connector)}><RefreshCw className={syncing === connector.id ? 'spin' : ''} />{syncing === connector.id ? 'Rebuilding…' : 'Sync & rebuild'}</button></section>)}</div>
-    <p className="source-note"><b>Connector design:</b> Pipedrive supplies CRM claims, Google Drive supplies independent PDF evidence, and Notion adds messy work-tracker claims. The local folder remains an offline fallback and is excluded when Drive is live. Scanned PDFs are flagged for OCR before extraction.</p>
+    <p className="source-note"><b>Deployment mode:</b> Pipedrive CRM is active. Google Drive, Notion, and local document connectors are disabled and excluded from sync and compilation.</p>
   </div>;
 }
 

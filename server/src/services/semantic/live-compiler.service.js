@@ -4,6 +4,7 @@ import { SemanticFactModel } from '../../models/SemanticFact.js';
 import { BusinessTruthModel } from '../../models/BusinessTruth.js';
 import { SemanticMapModel } from '../../models/SemanticMap.js';
 import { semanticAiService } from '../ai/semantic-ai.service.js';
+import { isSourceEnabled } from '../../config/sources.js';
 
 const normalize = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const distinct = (values) => [...new Set(values.filter(Boolean))];
@@ -22,13 +23,23 @@ function cleanOwnerLabel(name) {
     .trim();
 }
 
-function isPlausibleOwnerLabel(name) {
-  const cleaned = cleanOwnerLabel(name);
-  return cleaned.length > 1 && /^[A-Z][A-Za-z.]+(?:\s+[A-Z][A-Za-z.]+)*$/.test(cleaned);
+export function isPlausibleOwnerName(value) {
+  const name = String(value ?? '').trim();
+  const words = name.split(/\s+/).filter(Boolean);
+  return name.length > 0
+    && name.length < 40
+    && words.length >= 1
+    && words.length <= 4
+    && !/[\d:-]/.test(name)
+    && !/\b(?:arn|status|synthetic|document)\b/i.test(name)
+    && words.every((word) => /^[A-Z][A-Za-z.]*$/.test(word));
 }
 
 function sanitizeOwnerLabels(values) {
-  return distinct(values.map(cleanOwnerLabel).filter(isPlausibleOwnerLabel));
+  return distinct(values
+    .filter(isPlausibleOwnerName)
+    .map(cleanOwnerLabel)
+    .filter(isPlausibleOwnerName));
 }
 
 function fieldHintScore(fieldName, hints) {
@@ -301,15 +312,15 @@ function canonicalOwners(groups) {
 }
 
 function resolveOwner(alias, ownerIndex) {
-  if (!alias) return null;
+  if (!isPlausibleOwnerName(alias)) return null;
   const direct = ownerIndex.aliasMap.get(normalize(alias));
-  if (direct) return direct;
+  if (isPlausibleOwnerName(direct)) return direct;
   let best = null, score = 0;
   for (const canonical of ownerIndex.explicit) {
     const candidate = ownerSimilarity(alias, canonical);
     if (candidate > score) { best = canonical; score = candidate; }
   }
-  return score >= 0.76 ? best : alias;
+  return score >= 0.76 && isPlausibleOwnerName(best) ? best : alias;
 }
 
 function fuseGroup(group, ownerIndex, tenantId) {
@@ -318,7 +329,11 @@ function fuseGroup(group, ownerIndex, tenantId) {
   const references = distinct(group.map((fact) => fact.reference));
   const reference = references.find((value) => group.filter((fact) => normalize(fact.reference) === normalize(value)).length > 1) || references[0] || null;
   const aliases = sanitizeOwnerLabels(group.flatMap((fact) => [fact.ownerRaw, fact.ownerCanonical]));
-  const owners = distinct(aliases.map((alias) => cleanOwnerLabel(resolveOwner(alias, ownerIndex)))).filter(isPlausibleOwnerLabel);
+  const owners = distinct(aliases
+    .map((alias) => resolveOwner(alias, ownerIndex))
+    .filter(isPlausibleOwnerName)
+    .map(cleanOwnerLabel)
+    .filter(isPlausibleOwnerName));
   const valid = group.filter((fact) => fact.evidenceType !== 'stale_export');
   const completedStrong = valid.filter((fact) => fact.lifecycleClaim === 'completed' && fact.evidenceStrength >= 0.75);
   const openStrong = valid.filter((fact) => fact.lifecycleClaim === 'open' && fact.evidenceStrength >= 0.7);
@@ -430,7 +445,7 @@ function profileCustomFields(bundles, facts) {
 }
 
 export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
-  const indexedRecords = repository.findRecords(tenantId).filter((record) => ['pipedrive', 'documents', 'google_drive', 'notion'].includes(record.source));
+  const indexedRecords = repository.findRecords(tenantId).filter((record) => isSourceEnabled(record.source));
   const hasLiveDrive = indexedRecords.some((record) => record.source === 'google_drive' && record.entity === 'file');
   // The local folder mirrors Drive for offline development. Never compile both copies as independent evidence.
   const records = hasLiveDrive ? indexedRecords.filter((record) => record.source !== 'documents') : indexedRecords;
@@ -510,20 +525,18 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
 
   const peopleEntries = ownerIndex.explicit.map((person) => {
     const cleanPersonName = cleanOwnerLabel(person);
+    if (!isPlausibleOwnerName(cleanPersonName)) return null;
     const ownerAliases = sanitizeOwnerLabels(truths.filter((truth) => truth.owners.includes(cleanPersonName)).flatMap((truth) => truth.ownerAliases));
-    const uniquePeople = distinct([...ownerAliases, cleanPersonName].filter(Boolean));
+    const uniquePeople = distinct([...ownerAliases, cleanPersonName].filter(isPlausibleOwnerName));
     return [cleanPersonName, uniquePeople];
-  });
+  }).filter(Boolean);
   const glossary = {
     topics: distinct(truths.map((truth) => truth.topic)),
     people: Object.fromEntries(peopleEntries),
     clients: distinct(truths.map((truth) => truth.client))
   };
   const sourceProfiles = {
-    pipedrive: { deals: bundles.filter((bundle) => bundle.source === 'pipedrive').length, customFields: fieldHypotheses },
-    documents: { files: bundles.filter((bundle) => bundle.source === 'documents').length, ocrRequired: records.filter((record) => record.source === 'documents' && record.fields.ocrRequired).length },
-    googleDrive: { files: bundles.filter((bundle) => bundle.source === 'google_drive').length, ocrRequired: records.filter((record) => record.source === 'google_drive' && record.fields.ocrRequired).length, authoritative: hasLiveDrive },
-    notion: { workItems: bundles.filter((bundle) => bundle.source === 'notion').length }
+    pipedrive: { deals: bundles.filter((bundle) => bundle.source === 'pipedrive').length, customFields: fieldHypotheses }
   };
   const previous = await SemanticMapModel.findOne({ tenantId }).lean();
   const semanticMap = await SemanticMapModel.findOneAndUpdate(
@@ -537,11 +550,7 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
         fieldHypotheses,
         warnings: [
           'Official CRM owner is shared and should not be treated as the actual handler.',
-          'Official CRM lifecycle can be stale; documentary evidence is weighted more strongly.',
-          'A stale CRM export exists in the document source and is excluded from independent counts.',
-          hasLiveDrive
-            ? 'Google Drive is the authoritative document source; its local mirror is excluded to prevent duplicate evidence.'
-            : 'The local evidence folder is an offline fallback until Google Drive is synced.'
+          'This CRM-only deployment compiles Pipedrive data only.'
         ],
         stats: { bundles: bundles.length, facts: facts.length, truths: truths.length, conflicts: truths.filter((truth) => truth.conflict).length, unknown: truths.filter((truth) => truth.state === 'unknown').length },
         ai: extracted.ai,

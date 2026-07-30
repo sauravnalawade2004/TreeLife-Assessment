@@ -15,6 +15,7 @@ import { notionConnector } from '../connectors/notion.connector.js';
 import { syncNotion } from '../services/sync/notion-sync.service.js';
 import { googleDriveConnector } from '../connectors/google-drive.connector.js';
 import { syncGoogleDrive } from '../services/sync/google-drive-sync.service.js';
+import { assertSourceEnabled } from '../config/sources.js';
 
 const demoFallbackEnabled = process.env.ALLOW_DEMO_FALLBACK === 'true';
 
@@ -26,11 +27,11 @@ export const apiController = {
   jiraHealth: async (_req,res,next) => { try {res.json({data:await jiraConnector.testConnection()});} catch(e){next(e);} },
   pipedriveHealth: async (_req,res,next) => { try {res.json({data:await pipedriveConnector.testConnection()});} catch(e){next(e);} },
   pipedriveSync: async (req,res,next) => { try {res.json({data:await syncPipedrive(req.body?.tenantId || 'acme-law', req.body || {})});} catch(e){next(e);} },
-  documentsHealth: async (_req,res,next) => { try {res.json({data:await localDocumentsConnector.testConnection()});} catch(e){next(e);} },
-  documentsSync: async (req,res,next) => { try {res.json({data:await syncLocalDocuments(req.body?.tenantId || 'acme-law')});} catch(e){next(e);} },
-  notionHealth: async (_req,res,next) => { try {res.json({data:await notionConnector.testConnection()});} catch(e){next(e);} },
-  notionSync: async (req,res,next) => { try {res.json({data:await syncNotion(req.body?.tenantId || 'acme-law')});} catch(e){next(e);} },
-  googleDriveHealth: async (_req,res,next) => { try {res.json({data:await googleDriveConnector.testConnection()});} catch(e){next(e);} },
-  googleDriveSync: async (req,res,next) => { try {res.json({data:await syncGoogleDrive(req.body?.tenantId || 'acme-law')});} catch(e){next(e);} },
+  documentsHealth: async (_req,res,next) => { try {assertSourceEnabled('documents'); res.json({data:await localDocumentsConnector.testConnection()});} catch(e){next(e);} },
+  documentsSync: async (req,res,next) => { try {assertSourceEnabled('documents'); res.json({data:await syncLocalDocuments(req.body?.tenantId || 'acme-law')});} catch(e){next(e);} },
+  notionHealth: async (_req,res,next) => { try {assertSourceEnabled('notion'); res.json({data:await notionConnector.testConnection()});} catch(e){next(e);} },
+  notionSync: async (req,res,next) => { try {assertSourceEnabled('notion'); res.json({data:await syncNotion(req.body?.tenantId || 'acme-law')});} catch(e){next(e);} },
+  googleDriveHealth: async (_req,res,next) => { try {assertSourceEnabled('google_drive'); res.json({data:await googleDriveConnector.testConnection()});} catch(e){next(e);} },
+  googleDriveSync: async (req,res,next) => { try {assertSourceEnabled('google_drive'); res.json({data:await syncGoogleDrive(req.body?.tenantId || 'acme-law')});} catch(e){next(e);} },
   compileSemantic: async (req,res,next) => { try {res.json({data:await compileLiveSemanticLayer(req.body?.tenantId || 'acme-law')});} catch(e){next(e);} }
 };

@@ -2,6 +2,7 @@ import { BusinessTruthModel } from '../../models/BusinessTruth.js';
 import { SemanticMapModel } from '../../models/SemanticMap.js';
 import { TenantModel } from '../../models/Tenant.js';
 import { liveQueryPlannerService } from '../ai/live-query-planner.service.js';
+import { isSourceEnabled } from '../../config/sources.js';
 
 const normalize = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const crmEntityTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opportunities', 'prospect', 'prospects', 'pipeline', 'pipelines', 'organization', 'organizations', 'stage', 'stages', 'owner', 'owners', 'account', 'accounts', 'client', 'clients', 'customer', 'customers', 'company', 'companies', 'business', 'businesses'];
@@ -10,11 +11,8 @@ const filingTopic = (topic) => /filing|return|application/.test(topic || '');
 const liveConnectorIds = new Set(['pipedrive-acme', 'documents-acme', 'google-drive-acme', 'notion-acme']);
 
 function activeConnectors(connectors = []) {
-  const live = connectors.filter((connector) => liveConnectorIds.has(connector.id));
-  const selected = live.length ? live : connectors;
-  return selected.some((connector) => connector.id === 'google-drive-acme')
-    ? selected.filter((connector) => connector.id !== 'documents-acme')
-    : selected;
+  const live = connectors.filter((connector) => liveConnectorIds.has(connector.id) && isSourceEnabled(connector.type));
+  return live;
 }
 
 function levenshtein(a, b) {
