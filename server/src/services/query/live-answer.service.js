@@ -9,6 +9,9 @@ const crmEntityTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opport
 const crmTermRegex = new RegExp(`\\b(?:${crmEntityTerms.join('|')})\\b`);
 const filingTopic = (topic) => /filing|return|application/.test(topic || '');
 const liveConnectorIds = new Set(['pipedrive-acme', 'documents-acme', 'google-drive-acme', 'notion-acme']);
+function hasRankingKeyword(question) {
+  return /\b(?:most|least|highest|top|lowest|fewest|best|worst)\b/.test(String(question || '').toLowerCase());
+}
 
 function activeConnectors(connectors = []) {
   const live = connectors.filter((connector) => liveConnectorIds.has(connector.id) && isSourceEnabled(connector.type));
@@ -187,9 +190,11 @@ export class LiveAnswerService {
       if (!inRange(truth, plan.timeRange)) return false;
       return true;
     });
-    const groupedCandidates = plan.groupByClient
+    const groupedCandidates = plan.groupByClient || plan.groupByOwner
       ? [...scopedCandidates.reduce((groups, truth) => {
-        const key = truth.client || truth.reference || truth.truthId;
+        const key = plan.groupByOwner
+          ? (truth.owners && truth.owners[0]) || truth.reference || truth.truthId
+          : truth.client || truth.reference || truth.truthId;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(truth);
         return groups;
@@ -205,19 +210,31 @@ export class LiveAnswerService {
           : plan.requireAllStatesInGroup && plan.states && plan.states.length > 0
             ? (group) => plan.states.every((requiredState) => group.some((truth) => truth.state === requiredState))
             : () => true)
-        .map((group) => group[0])
-      : scopedCandidates;
+        .map((group) => ({ representative: group[0], count: group.length }))
+      : scopedCandidates.map((truth) => ({ representative: truth, count: 1 }));
     const matched = plan.requireNoMatchingInGroup
       ? groupedCandidates
-      : groupedCandidates.filter(matchesState);
-    const unresolved = groupedCandidates.filter((truth) => truth.state === 'unknown' || truth.conflict);
-    const broadCount = plan.operation === 'count' && !plan.topic && !plan.person && !plan.client && !plan.state && !plan.groupByClient && crmTermRegex.test(String(question || '').toLowerCase()) && isGenericCrmQuestion(question);
+      : groupedCandidates.filter((item) => matchesState(item.representative));
+    const unresolved = groupedCandidates.filter((item) => item.representative.state === 'unknown' || item.representative.conflict);
+    const broadCount = plan.operation === 'count' && !plan.topic && !plan.person && !plan.client && !plan.state && !plan.groupByClient && !plan.groupByOwner && crmTermRegex.test(String(question || '').toLowerCase()) && isGenericCrmQuestion(question);
     const countCandidates = broadCount ? truths.filter((truth) => truth.sources.includes('pipedrive') && inRange(truth, plan.timeRange)) : [];
     const allHealthy = sourceCoverage.filter((item) => item.status === 'checked').every((item) => ['healthy', 'demo'].includes(item.health));
+    const isRanking = hasRankingKeyword(question);
+    const descending = /\b(?:most|highest|top|best)\b/.test(String(question || '').toLowerCase());
     let status = 'ANSWERED', answer = null;
-    let evidenceItems = matched;
+    let evidenceItems = matched.map((item) => item.representative);
     let selectedStatusItem = null;
-    if (plan.operation === 'locate') {
+    if (isRanking && matched.length > 0) {
+      const sorted = [...matched].sort((a, b) => descending ? b.count - a.count : a.count - b.count);
+      const top = sorted[0];
+      const dimension = plan.groupByOwner ? 'owner' : 'client';
+      status = 'ANSWERED';
+      answer = {
+        value: { [dimension]: top.representative[dimension] || top.representative.client || top.representative.reference, count: top.count },
+        text: `${top.representative[dimension] || top.representative.client || top.representative.reference} has the ${descending ? 'most' : 'least'} deals with ${top.count} verified deal${top.count === 1 ? '' : 's'}.`
+      };
+      evidenceItems = [top.representative];
+    } else if (plan.operation === 'locate') {
       const located = matched.find((truth) => truth.bestPath) || candidates.find((truth) => truth.bestPath && (!plan.topic || normalize(truth.topic) === normalize(plan.topic)));
       if (!located) status = 'UNKNOWN';
       else answer = { value: located.bestPath, url: located.bestUrl || null, text: `The best verified location is ${located.bestPath}.` };
@@ -235,7 +252,7 @@ export class LiveAnswerService {
       } else answer = { value: item.state, text: `${item.client || 'The item'} is ${item.state}.` };
     } else if (plan.operation === 'list' || plan.operation === 'summarize') {
       if (!matched.length) status = unresolved.length ? 'UNKNOWN' : (allHealthy ? 'VERIFIED_ZERO' : 'UNKNOWN');
-      else answer = { value: matched.map((truth) => ({ client: truth.client, topic: truth.topic, state: truth.state, reference: truth.reference })), text: matched.map((truth) => `${truth.client || truth.reference || truth.truthId} (${truth.state})`).join(', ') };
+      else answer = { value: matched.map((item) => ({ client: item.representative.client, topic: item.representative.topic, state: item.representative.state, reference: item.representative.reference, count: item.count })), text: matched.map((item) => `${item.representative.client || item.representative.reference || item.representative.truthId} (${item.representative.state}, ${item.count} deals)`).join(', ') };
       if (status === 'UNKNOWN') answer = { value: null, text: 'A verified list cannot be returned because relevant evidence is incomplete or conflicting.' };
     } else {
       if (!matched.length && broadCount && countCandidates.length) {
@@ -243,17 +260,20 @@ export class LiveAnswerService {
       }
       if (!matched.length) status = unresolved.length ? 'UNKNOWN' : (allHealthy ? 'VERIFIED_ZERO' : 'UNKNOWN');
       const value = matched.length || (broadCount ? countCandidates.length : 0);
+      const valueLabel = (plan.groupByClient || plan.groupByOwner) && matched.length > 0
+        ? `${matched.length} ${label(plan.groupByClient ? 'organization' : 'owner', matched.length)}`
+        : label(plan.topic || plan.scope, value);
       answer = status === 'UNKNOWN'
         ? { value: null, unit: label(plan.topic || plan.scope), text: 'A verified number cannot be given because relevant evidence is incomplete or conflicting.' }
         : status === 'VERIFIED_ZERO'
         ? { value: 0, unit: label(plan.topic || plan.scope), text: `No verified matching ${label(plan.topic || plan.scope)} were found.` }
-        : { value, unit: label(plan.topic || plan.scope, value), text: `${value} verified ${label(plan.topic || plan.scope, value)} matched the question.` };
+        : { value, unit: valueLabel, text: `${value} verified ${valueLabel} matched the question.` };
     }
     const average = evidenceItems.length ? evidenceItems.reduce((sum, truth) => sum + truth.confidence, 0) / evidenceItems.length : 0.78;
     const confidence = status === 'UNKNOWN' ? 0.35 : status === 'CONFLICT' ? 0.58 : Math.min(0.97, average);
     const matchedFacts = evidenceItems.flatMap((truth) => truth.evidence || []);
     const evidenceIds = new Set(evidenceItems.map((truth) => truth.truthId));
-    const unresolvedExcluded = unresolved.filter((truth) => !evidenceIds.has(truth.truthId));
+    const unresolvedExcluded = unresolved.filter((item) => !evidenceIds.has(item.representative.truthId));
     return {
       status,
       question,
@@ -267,7 +287,7 @@ export class LiveAnswerService {
         sourceCoverage,
         records: evidenceItems.map((truth) => ({ truthId: truth.truthId, client: truth.client, topic: truth.topic, state: truth.state, reference: truth.reference, confidence: truth.confidence, sources: truth.sources, bestPath: truth.bestPath, bestUrl: truth.bestUrl })),
         sourceEvidence: matchedFacts,
-        unresolvedExcluded: unresolvedExcluded.map((truth) => truth.truthId),
+        unresolvedExcluded: unresolvedExcluded.map((item) => item.representative.truthId),
         debugPersonFilter: debugInfo
       },
       reasoning: [

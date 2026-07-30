@@ -137,11 +137,12 @@ test('unsupported negation and ranking questions return clarification before exe
       assert.notEqual(result.answer, null);
       assert.equal(result.answer.value, expectedCount);
     }
-    const rankingResult = await service.answer('acme-law', 'who owns the most deals');
-    assert.equal(rankingResult.status, 'NEEDS_CLARIFICATION');
-    assert.equal(rankingResult.answer, null);
-    assert.equal(rankingResult.interpretation.unsupportedFeature, 'ranking');
-    assert.deepEqual(rankingResult.evidence.matchedRecordIds, []);
+    const rankingResult = await service.answer('acme-law', 'which client has the most deals');
+    assert.equal(rankingResult.status, 'ANSWERED');
+    assert.notEqual(rankingResult.answer, null);
+    assert.equal(rankingResult.answer.value.client, 'Cedar Works');
+    assert.equal(rankingResult.answer.value.count, 1);
+    assert.ok(rankingResult.answer.text.includes('most'));
   } finally {
     BusinessTruthModel.find = originals.businessFind;
     SemanticMapModel.findOne = originals.mapFindOne;
