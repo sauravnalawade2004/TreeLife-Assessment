@@ -14,6 +14,23 @@ const stripCompanySuffixes = (value) => String(value ?? '').toLowerCase()
 
 const OWNER_FIELD_HINTS = ['deal owner', 'lead owner', 'assigned to', 'assignee', 'responsible', 'handled by', 'handler', 'relationship manager', 'case handler', 'owner'];
 
+function cleanOwnerLabel(name) {
+  return String(name || '')
+    .replace(/\s*(?:ARN:|Status:.*|for.*|reference.*|token.*|case.*)\s*$/i, '')
+    .replace(/\s+[A-Z0-9]+[A-Z0-9-]*$|^\s*(?:[A-Z][a-z]+\s+){1,}(?:ARN|Status|Reference|Token)[a-z]*\s*$/, '')
+    .replace(/^(?:.,?\s*)?(Synthetic|assessment|evidence|document|--|of|1|all\s+of\s+\d+|GST|ID|A\/N)\s+/, '')
+    .trim();
+}
+
+function isPlausibleOwnerLabel(name) {
+  const cleaned = cleanOwnerLabel(name);
+  return cleaned.length > 1 && /^[A-Z][A-Za-z.]+(?:\s+[A-Z][A-Za-z.]+)*$/.test(cleaned);
+}
+
+function sanitizeOwnerLabels(values) {
+  return distinct(values.map(cleanOwnerLabel).filter(isPlausibleOwnerLabel));
+}
+
 function fieldHintScore(fieldName, hints) {
   const normalized = String(fieldName ?? '').trim().toLowerCase();
   if (hints.some((hint) => normalized.includes(String(hint).toLowerCase()))) return 1;
@@ -260,7 +277,7 @@ function chooseTopic(group) {
 function canonicalOwners(groups) {
   const rawExplicit = distinct(groups.flatMap((group) => group.map((fact) => fact.ownerCanonical).filter(Boolean)));
   const rawFromRaw = distinct(groups.flatMap((group) => group.map((fact) => fact.ownerRaw).filter(Boolean)));
-  const allCandidates = distinct([...rawExplicit, ...rawFromRaw]);
+  const allCandidates = sanitizeOwnerLabels([...rawExplicit, ...rawFromRaw]);
   const completeness = (name) => {
     const words = String(name).split(/\s+/).filter(Boolean);
     return (words.length > 1 ? 2 : 0) + (normalize(words[0]).length > 2 ? 2 : 0) + String(name).length / 100;
@@ -300,8 +317,8 @@ function fuseGroup(group, ownerIndex, tenantId) {
   const client = chooseMostUseful(group.map((fact) => fact.client));
   const references = distinct(group.map((fact) => fact.reference));
   const reference = references.find((value) => group.filter((fact) => normalize(fact.reference) === normalize(value)).length > 1) || references[0] || null;
-  const aliases = distinct(group.flatMap((fact) => [fact.ownerRaw, fact.ownerCanonical]));
-  const owners = distinct(aliases.map((alias) => resolveOwner(alias, ownerIndex)));
+  const aliases = sanitizeOwnerLabels(group.flatMap((fact) => [fact.ownerRaw, fact.ownerCanonical]));
+  const owners = distinct(aliases.map((alias) => cleanOwnerLabel(resolveOwner(alias, ownerIndex)))).filter(isPlausibleOwnerLabel);
   const valid = group.filter((fact) => fact.evidenceType !== 'stale_export');
   const completedStrong = valid.filter((fact) => fact.lifecycleClaim === 'completed' && fact.evidenceStrength >= 0.75);
   const openStrong = valid.filter((fact) => fact.lifecycleClaim === 'open' && fact.evidenceStrength >= 0.7);
@@ -492,8 +509,8 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
   if (truths.length) await BusinessTruthModel.insertMany(truths);
 
   const peopleEntries = ownerIndex.explicit.map((person) => {
-    const cleanPersonName = String(person || '').replace(/\s*(?:ARN:|Status:.*|for.*|reference.*|token.*|case.*)\s*$/i, '').replace(/\s+[A-Z0-9]+[A-Z0-9-]*$|^\s*(?:[A-Z][a-z]+\s+){1,}(?:ARN|Status|Reference|Token)[a-z]*\s*$/, '').replace(/^(?:.,?\s*)?(Synthetic|assessment|evidence|document|--|of|1|all\s+of\s+\d+|GST|ID|A\/N)\s+/, '').trim();
-    const ownerAliases = distinct(truths.filter((truth) => truth.owners.includes(person)).flatMap((truth) => truth.ownerAliases)).map(n => String(n).replace(/\s*(?:ARN:|Status:.*|for.*|reference.*|token.*|case.*)\s*$/i, '').replace(/\s+[A-Z0-9]+[A-Z0-9-]*$|^\s*(?:[A-Z][a-z]+\s+){1,}(?:ARN|Status|Reference|Token)[a-z]*\s*$/, '').replace(/^(?:.,?\s*)?(Synthetic|assessment|evidence|document|--|of|1|all\s+of\s+\d+|GST|ID|A\/N)\s+/, '').trim()).filter(n => n && n.length > 1 && /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$/.test(n));
+    const cleanPersonName = cleanOwnerLabel(person);
+    const ownerAliases = sanitizeOwnerLabels(truths.filter((truth) => truth.owners.includes(cleanPersonName)).flatMap((truth) => truth.ownerAliases));
     const uniquePeople = distinct([...ownerAliases, cleanPersonName].filter(Boolean));
     return [cleanPersonName, uniquePeople];
   });

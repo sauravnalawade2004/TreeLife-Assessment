@@ -19,6 +19,45 @@ const crmEntityTerms = ['deal', 'deals', 'lead', 'leads', 'opportunity', 'opport
 const crmTermRegex = new RegExp(`\\b(?:${crmEntityTerms.join('|')})\\b`);
 const broadBusinessQuery = /\b(?:how many|how much|how many of|what is the|what are the|what are|total|overall|count|number of|show me|list|give me|all of|any of|where is|where are|status of|how many have|how many were|how many are)\b/;
 
+function normalizeQuestionText(question) {
+  return String(question || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function isExistentialQuestion(q) {
+  return /\b(?:is there|are there|there is|there are)\b/.test(q);
+}
+
+function isAggregationQuestion(q) {
+  if (/\b(?:how many|how much|number of|count of|give me the count)\b/.test(q)) return true;
+  if (/\bwhat(?:'s| is) the (?:total|count|number)\b/.test(q)) return true;
+  if (/\b(?:total|overall)\s+(?:number\s+of|count\s+of)?\b/.test(q)) return true;
+  if (/\b(?:total|overall|count)\b/.test(q) && !/\b(?:status|verify|was|did)\b/.test(q)) return true;
+  return false;
+}
+
+function isVerificationQuestion(q) {
+  if (isExistentialQuestion(q) || isAggregationQuestion(q)) return false;
+  if (/\b(?:was|did|verify)\b/.test(q)) return true;
+  return /\bis\b/.test(q) && /\b(?:filed|file|done|complete|closed|open|verified|submitted|paid|sent|cancelled|canceled|lost|won)\b/.test(q);
+}
+
+function inferOperationFromQuestion(question) {
+  const q = normalizeQuestionText(question);
+  if (isAggregationQuestion(q)) return 'count';
+  if (/\bwhere|kidhar|location|locate\b/.test(q)) return 'locate';
+  if (/\bwhich|list|show|dikhao\b/.test(q)) return 'list';
+  if (/\bstatus|what.*happening|chal raha\b/.test(q)) return 'status';
+  if (/\bsummary|summarize\b/.test(q)) return 'summarize';
+  if (isVerificationQuestion(q)) return 'verify';
+  return 'count';
+}
+
+function reconcileOperation(question, proposedOperation) {
+  const inferred = inferOperationFromQuestion(question);
+  if (inferred === 'count' && ['verify', 'status'].includes(proposedOperation)) return 'count';
+  return proposedOperation || inferred;
+}
+
 function normalizeMonth(value) {
   const monthMap = {
     jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', july: '07', jul: '07', aug: '08', sep: '09', sept: '09', oct: '10', nov: '11', dec: '12'
@@ -116,11 +155,7 @@ export function guardPlanForTenant(question, inputPlan, glossary = {}) {
 
 function fallbackPlan(question, glossary = {}) {
   const q = question.toLowerCase();
-  const operation = /\bwhere|kidhar|location|locate\b/.test(q) ? 'locate'
-    : /\bwhich|list|show|dikhao\b/.test(q) ? 'list'
-      : /\bstatus|what.*happening|chal raha\b/.test(q) ? 'status'
-        : /\bwas|is|did|verify\b/.test(q) ? 'verify'
-          : /\bsummary|summarize\b/.test(q) ? 'summarize' : 'count';
+  const operation = inferOperationFromQuestion(question);
   const scope = /\b(?:deal|deals|lead|leads|opportunity|opportunities|prospect|prospects|pipeline|pipelines|organization|organizations|org|orgs|stage|stages|owner|owners|contact|contacts|account|accounts|client|clients|customer|customers|company|companies|business|businesses)\b/.test(q) ? 'crm_deals' : /\bfile|document|pdf\b/.test(q) && operation === 'locate' ? 'files' : /\b(?:fil|return|itr|gst|tds|cfa|application|student|students|enrollment|enrollments|course|courses|fee|fees|semester|member|case)\b/.test(q) ? 'filings' : 'business_items';
   const topicPatterns = [
     ['income_tax_filing', /income tax|\bitr\b|it return/],
@@ -158,14 +193,18 @@ function fallbackPlan(question, glossary = {}) {
   });
 }
 
+function finalizePlan(question, plan, glossary) {
+  return guardPlanForTenant(question, { ...plan, operation: reconcileOperation(question, plan.operation) }, glossary);
+}
+
 export class LiveQueryPlannerService {
   async plan(question, semanticMap) {
     const glossary = semanticMap?.glossary || {};
-    if (!process.env.GEMINI_API_KEY) return { plan: guardPlanForTenant(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic' };
+    if (!process.env.GEMINI_API_KEY) return { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic' };
     try {
       const geminiPlan = await this.#gemini(question, semanticMap);
-    const guardedGemini = guardPlanForTenant(question, geminiPlan, glossary);
-    const fallback = guardPlanForTenant(question, fallbackPlan(question, glossary), glossary);
+    const guardedGemini = finalizePlan(question, geminiPlan, glossary);
+    const fallback = finalizePlan(question, fallbackPlan(question, glossary), glossary);
     const genericCrm = crmTermRegex.test(question.toLowerCase()) && ['crm_deals','business_items'].includes(fallback.scope);
     const explicitListRequest = /\b(which|list|show|dikhao|where|where are|where is)\b/.test(question.toLowerCase());
     if (guardedGemini.requiresClarification && !fallback.requiresClarification && fallback.supportedByTenant) {
@@ -179,7 +218,7 @@ export class LiveQueryPlannerService {
     }
     return { plan: guardedGemini, aiCalls: 1, provider: 'gemini' };
     } catch {
-      return { plan: guardPlanForTenant(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic-fallback' };
+      return { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic-fallback' };
     }
   }
 
@@ -188,6 +227,8 @@ export class LiveQueryPlannerService {
     const glossary = semanticMap?.glossary || {};
     const prompt = `Plan a deterministic query over a tenant-specific semantic business layer. Return JSON only and never answer the question.
 Allowed operation: count,list,locate,status,verify,summarize.
+Use operation=count for cardinality questions (how many, total, count of, number of, what is the total). Existential phrasing such as "is there" or "are there" is still count when asking for quantity, not verify.
+Use operation=verify only for yes/no checks about a specific claim or state (was it filed, is deal X closed).
 Allowed scope: crm_deals,filings,files,business_items.
 Allowed state: completed,open,cancelled,unknown or null.
 Allowed timeRange: all,last_month,this_month,this_year,last_year,YYYY,YYYY-MM.

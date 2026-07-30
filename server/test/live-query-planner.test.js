@@ -103,3 +103,24 @@ test('extracts explicit month and year ranges from plain language', async () => 
   assert.equal(result.plan.timeRange, '2026-07');
   assert.equal(result.plan.requiresClarification, false);
 });
+
+test('classifies existential count questions as count, not verify', async () => {
+  const service = new (await import('../src/services/ai/live-query-planner.service.js')).LiveQueryPlannerService();
+  const queries = [
+    'how many organization is there in pipedrive',
+    'How many leads are there?',
+    'What is the total number of companies?',
+    'Give me the count of deals.',
+    'How many customers do we have overall?'
+  ];
+  for (const question of queries) {
+    const result = await service.plan(question, { glossary: { topics: [], people: {}, clients: [] } });
+    assert.equal(result.plan.operation, 'count', `Expected count for: ${question}`);
+  }
+});
+
+test('still classifies explicit verification questions as verify', async () => {
+  const service = new (await import('../src/services/ai/live-query-planner.service.js')).LiveQueryPlannerService();
+  const result = await service.plan('Was the income tax filing completed?', { glossary: { topics: ['income_tax_filing'], people: {}, clients: [] } });
+  assert.equal(result.plan.operation, 'verify');
+});
