@@ -9,6 +9,13 @@ const Plan = z.object({
   state: z.enum(['completed', 'open', 'cancelled', 'unknown']).nullable().default(null),
   timeRange: z.string().default('all'),
   expandedTerms: z.array(z.string()).default([]),
+  negated: z.boolean().default(false),
+  negatedTopic: z.boolean().default(false),
+  negatedPerson: z.boolean().default(false),
+  negatedClient: z.boolean().default(false),
+  negatedState: z.boolean().default(false),
+  groupByClient: z.boolean().default(false),
+  requireNoMatchingInGroup: z.boolean().default(false),
   unsupportedFeature: z.enum(['negation', 'ranking']).nullable().default(null),
   supportedByTenant: z.boolean().default(true),
   requiresClarification: z.boolean().default(false),
@@ -168,6 +175,13 @@ function unsupportedFeaturePlan(question, glossary, feature) {
     client: null,
     state: null,
     expandedTerms: [],
+    negated: false,
+    negatedTopic: false,
+    negatedPerson: false,
+    negatedClient: false,
+    negatedState: false,
+    groupByClient: false,
+    requireNoMatchingInGroup: false,
     unsupportedFeature: feature,
     requiresClarification: true,
     clarification: `Questions requiring ${description} are not supported yet. Please rephrase without that constraint.`
@@ -234,6 +248,13 @@ function fallbackPlan(question, glossary = {}) {
     state,
     timeRange: extractTimeRange(q),
     expandedTerms: topic ? [topic, topic.replaceAll('_', ' ')] : [],
+    negated: false,
+    negatedTopic: false,
+    negatedPerson: false,
+    negatedClient: false,
+    negatedState: false,
+    groupByClient: false,
+    requireNoMatchingInGroup: false,
     supportedByTenant: true,
     requiresClarification: false,
     clarification: null
@@ -247,18 +268,19 @@ function finalizePlan(question, plan, glossary) {
 export class LiveQueryPlannerService {
   async plan(question, semanticMap) {
     const glossary = semanticMap?.glossary || {};
-    const unsupportedFeature = unsupportedFeatureInQuestion(question);
-    if (unsupportedFeature) return { plan: unsupportedFeaturePlan(question, glossary, unsupportedFeature), aiCalls: 0, provider: 'safety-guard' };
-    if (!process.env.GEMINI_API_KEY) return { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic' };
+    if (!process.env.GEMINI_API_KEY) {
+      const unsupportedFeature = unsupportedFeatureInQuestion(question);
+      return unsupportedFeature
+        ? { plan: unsupportedFeaturePlan(question, glossary, unsupportedFeature), aiCalls: 0, provider: 'safety-guard' }
+        : { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic' };
+    }
     try {
       const geminiPlan = await this.#gemini(question, semanticMap);
     const guardedGemini = finalizePlan(question, geminiPlan, glossary);
     const fallback = finalizePlan(question, fallbackPlan(question, glossary), glossary);
+    if (guardedGemini.requiresClarification) return { plan: guardedGemini, aiCalls: 1, provider: 'gemini' };
     const genericCrm = crmTermRegex.test(question.toLowerCase()) && ['crm_deals','business_items'].includes(fallback.scope);
     const explicitListRequest = /\b(which|list|show|dikhao|where|where are|where is)\b/.test(question.toLowerCase());
-    if (guardedGemini.requiresClarification && !fallback.requiresClarification && fallback.supportedByTenant) {
-      return { plan: fallback, aiCalls: 1, provider: 'gemini' };
-    }
     if (genericCrm && fallback.operation === 'count' && guardedGemini.operation !== 'count' && !explicitListRequest) {
       return { plan: fallback, aiCalls: 1, provider: 'gemini' };
     }
@@ -267,7 +289,10 @@ export class LiveQueryPlannerService {
     }
     return { plan: guardedGemini, aiCalls: 1, provider: 'gemini' };
     } catch {
-      return { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic-fallback' };
+      const unsupportedFeature = unsupportedFeatureInQuestion(question);
+      return unsupportedFeature
+        ? { plan: unsupportedFeaturePlan(question, glossary, unsupportedFeature), aiCalls: 0, provider: 'safety-guard' }
+        : { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic-fallback' };
     }
   }
 
@@ -282,11 +307,12 @@ Allowed scope: crm_deals,filings,files,business_items.
 Allowed state: completed,open,cancelled,unknown or null.
 Allowed timeRange: all,last_month,this_month,this_year,last_year,YYYY,YYYY-MM.
 Only set topic when the question explicitly names a subject/category, such as GST, contract, or income tax. Generic CRM nouns such as deal(s), lead(s), opportunity, or pipeline define scope only: use scope=crm_deals and topic=null for them. Use expandedTerms for synonyms and abbreviations. "Filed/filled/done/submitted" means completed. "Open/pending/chal raha" means open.
+Understand negation and exclusion semantically in any language or phrasing; do not rely on individual words. For an excluded owner, set person to the excluded person, negated=true, and negatedPerson=true. Apply the same field-level convention for topic, client, and state using negatedTopic, negatedClient, and negatedState. For organization/client requests meaning "no member has this condition" (for example, organizations with zero open deals), set groupByClient=true and requireNoMatchingInGroup=true; retain the target state/person as a positive condition to test inside each group, rather than applying it as a record filter. Do not set requiresClarification merely because negation is present: encode the requested inversion. If meaning is genuinely unclear, set requiresClarification=true instead of guessing.
 If a term is genuinely ambiguous (for example closed could include completed and cancelled), set requiresClarification and provide one short clarification. Do not invent a client or person.
 Set supportedByTenant=false and requiresClarification=true when the question is unrelated to the connected business data or its subject cannot be mapped to the tenant glossary. Never map an unrelated general-knowledge question to business_items.
 Tenant glossary: ${JSON.stringify({ topics: glossary.topics || [], people: glossary.people || {}, clients: glossary.clients || [] })}
 Question: ${JSON.stringify(question)}
-Return fields: operation,scope,topic,person,client,state,timeRange,expandedTerms,supportedByTenant,requiresClarification,clarification.`;
+Return fields: operation,scope,topic,person,client,state,timeRange,expandedTerms,negated,negatedTopic,negatedPerson,negatedClient,negatedState,groupByClient,requireNoMatchingInGroup,supportedByTenant,requiresClarification,clarification.`;
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

@@ -87,7 +87,10 @@ function inRange(truth, range) {
 }
 
 function topicMatches(truth, plan) {
-  if (plan.topic && normalize(truth.topic) !== normalize(plan.topic)) return false;
+  if (plan.topic) {
+    const matchesTopic = normalize(truth.topic) === normalize(plan.topic);
+    if (plan.negatedTopic ? matchesTopic : !matchesTopic) return false;
+  }
   if (plan.scope === 'crm_deals' && !truth.sources.includes('pipedrive')) return false;
   if (plan.scope === 'files' && !truth.sources.some((source) => ['documents', 'google_drive'].includes(source))) return false;
   if (plan.scope === 'filings' && !filingTopic(truth.topic)) return false;
@@ -161,15 +164,44 @@ export class LiveAnswerService {
         aliasesMatchTest: (truth.ownerAliases || []).map((alias) => ({ alias, fuzzyMatchResult: fuzzyMatch(alias, plan.person) }))
       }))
     } : null;
+    const negatePerson = plan.negatedPerson || (plan.negated && Boolean(plan.person) && !plan.requireNoMatchingInGroup);
+    const negateClient = plan.negatedClient || (plan.negated && Boolean(plan.client) && !plan.requireNoMatchingInGroup);
+    const negateState = plan.negatedState || (plan.negated && Boolean(plan.state) && !plan.requireNoMatchingInGroup);
+    const matchesPerson = (truth) => !plan.person || [...(truth.owners || []), ...(truth.ownerAliases || [])].some((owner) => fuzzyMatch(owner, plan.person));
+    const matchesState = (truth) => !plan.state || (negateState ? truth.state !== plan.state : truth.state === plan.state);
     const scopedCandidates = candidates.filter((truth) => {
-      if (plan.person && ![...(truth.owners || []), ...(truth.ownerAliases || [])].some((owner) => fuzzyMatch(owner, plan.person))) return false;
-      if (plan.client && !fuzzyMatch(truth.client, plan.client)) return false;
+      // Group-level absence checks evaluate the target condition inside each
+      // organization below, rather than filtering its records beforehand.
+      if (!plan.requireNoMatchingInGroup && plan.person) {
+        const personMatches = matchesPerson(truth);
+        if (negatePerson ? personMatches : !personMatches) return false;
+      }
+      if (plan.client) {
+        const clientMatches = fuzzyMatch(truth.client, plan.client);
+        if (negateClient ? clientMatches : !clientMatches) return false;
+      }
       if (!inRange(truth, plan.timeRange)) return false;
       return true;
     });
-    const matched = scopedCandidates.filter((truth) => !plan.state || truth.state === plan.state);
-    const unresolved = scopedCandidates.filter((truth) => truth.state === 'unknown' || truth.conflict);
-    const broadCount = plan.operation === 'count' && !plan.topic && crmTermRegex.test(String(question || '').toLowerCase()) && isGenericCrmQuestion(question);
+    const groupedCandidates = plan.groupByClient && plan.requireNoMatchingInGroup
+      ? [...scopedCandidates.reduce((groups, truth) => {
+        const key = truth.client || truth.reference || truth.truthId;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(truth);
+        return groups;
+      }, new Map()).values()]
+        .filter((group) => !group.some((truth) => {
+          const personMatches = matchesPerson(truth);
+          const stateMatches = !plan.state || truth.state === plan.state;
+          return personMatches && stateMatches;
+        }))
+        .map((group) => group[0])
+      : scopedCandidates;
+    const matched = plan.groupByClient && plan.requireNoMatchingInGroup
+      ? groupedCandidates
+      : groupedCandidates.filter(matchesState);
+    const unresolved = groupedCandidates.filter((truth) => truth.state === 'unknown' || truth.conflict);
+    const broadCount = plan.operation === 'count' && !plan.topic && !plan.person && !plan.client && !plan.state && !plan.groupByClient && crmTermRegex.test(String(question || '').toLowerCase()) && isGenericCrmQuestion(question);
     const countCandidates = broadCount ? truths.filter((truth) => truth.sources.includes('pipedrive') && inRange(truth, plan.timeRange)) : [];
     const allHealthy = sourceCoverage.filter((item) => item.status === 'checked').every((item) => ['healthy', 'demo'].includes(item.health));
     let status = 'ANSWERED', answer = null;

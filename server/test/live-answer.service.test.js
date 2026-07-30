@@ -146,3 +146,45 @@ test('unsupported negation and ranking questions return clarification before exe
     else process.env.GEMINI_API_KEY = originals.geminiKey;
   }
 });
+
+test('executes Gemini-provided negated filters and organization absence groups', async () => {
+  const originals = {
+    businessFind: BusinessTruthModel.find,
+    mapFindOne: SemanticMapModel.findOne,
+    tenantFindOne: TenantModel.findOne,
+    plannerPlan: liveQueryPlannerService.plan
+  };
+  let plan;
+  const truths = [
+    truth({ truthId: 'garima-open', client: 'Aster', owners: ['Garima Sharma'], ownerAliases: ['Garima'], state: 'open', sources: ['pipedrive'] }),
+    truth({ truthId: 'karan-completed', client: 'Aster', owners: ['Karan Shah'], ownerAliases: ['Karan'], state: 'completed', sources: ['pipedrive'] }),
+    truth({ truthId: 'priya-completed', client: 'Beta', owners: ['Priya Rao'], ownerAliases: ['Priya'], state: 'completed', sources: ['pipedrive'] })
+  ];
+  BusinessTruthModel.find = () => ({ lean: async () => truths });
+  SemanticMapModel.findOne = () => ({ lean: async () => ({ tenantId: 'acme-law', version: 11, glossary: {} }) });
+  TenantModel.findOne = () => ({ lean: async () => ({ tenantId: 'acme-law', connectors: [{ id: 'pipedrive-acme', type: 'crm', name: 'Pipedrive', status: 'healthy' }] }) });
+  liveQueryPlannerService.plan = async () => ({ provider: 'gemini-test', aiCalls: 1, plan });
+  try {
+    const service = new LiveAnswerService();
+    plan = { ...basePlan, operation: 'count', scope: 'crm_deals', topic: null, person: 'Garima Sharma', client: null, state: null, negated: true, negatedPerson: true };
+    for (const question of ['deals excluding Garima', 'everyone else\'s deals besides Garima']) {
+      const result = await service.answer('acme-law', question);
+      assert.equal(result.status, 'ANSWERED');
+      assert.equal(result.answer.value, 2);
+      assert.deepEqual(result.evidence.matchedRecordIds.sort(), ['karan-completed', 'priya-completed']);
+    }
+
+    plan = { ...basePlan, operation: 'count', scope: 'crm_deals', topic: null, person: null, client: null, state: 'open', groupByClient: true, requireNoMatchingInGroup: true };
+    for (const question of ['organizations that have zero open deals', 'orgs with no open pipeline']) {
+      const result = await service.answer('acme-law', question);
+      assert.equal(result.status, 'ANSWERED');
+      assert.equal(result.answer.value, 1);
+      assert.deepEqual(result.evidence.matchedRecordIds, ['priya-completed']);
+    }
+  } finally {
+    BusinessTruthModel.find = originals.businessFind;
+    SemanticMapModel.findOne = originals.mapFindOne;
+    TenantModel.findOne = originals.tenantFindOne;
+    liveQueryPlannerService.plan = originals.plannerPlan;
+  }
+});
