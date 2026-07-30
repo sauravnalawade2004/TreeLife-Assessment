@@ -9,6 +9,7 @@ const Plan = z.object({
   state: z.enum(['completed', 'open', 'cancelled', 'unknown']).nullable().default(null),
   timeRange: z.string().default('all'),
   expandedTerms: z.array(z.string()).default([]),
+  unsupportedFeature: z.enum(['negation', 'ranking']).nullable().default(null),
   supportedByTenant: z.boolean().default(true),
   requiresClarification: z.boolean().default(false),
   clarification: z.string().nullable().default(null)
@@ -150,6 +151,29 @@ function removeImplicitGenericCrmTopic(question, plan) {
   return { ...plan, topic: null, expandedTerms: [] };
 }
 
+function unsupportedFeatureInQuestion(question) {
+  const q = normalizeQuestionText(question);
+  if (/\b(?:not|without|excluding|except)\b/.test(q)) return 'negation';
+  if (/\b(?:most|least|highest|top)\b/.test(q)) return 'ranking';
+  return null;
+}
+
+function unsupportedFeaturePlan(question, glossary, feature) {
+  const fallback = fallbackPlan(question, glossary);
+  const description = feature === 'negation' ? 'negation or exclusion' : 'ranking or superlative comparison';
+  return Plan.parse({
+    ...fallback,
+    topic: null,
+    person: null,
+    client: null,
+    state: null,
+    expandedTerms: [],
+    unsupportedFeature: feature,
+    requiresClarification: true,
+    clarification: `Questions requiring ${description} are not supported yet. Please rephrase without that constraint.`
+  });
+}
+
 export function guardPlanForTenant(question, inputPlan, glossary = {}) {
   const plan = removeImplicitGenericCrmTopic(question, Plan.parse(inputPlan));
   const topics = (glossary.topics || []).map(normalize);
@@ -223,6 +247,8 @@ function finalizePlan(question, plan, glossary) {
 export class LiveQueryPlannerService {
   async plan(question, semanticMap) {
     const glossary = semanticMap?.glossary || {};
+    const unsupportedFeature = unsupportedFeatureInQuestion(question);
+    if (unsupportedFeature) return { plan: unsupportedFeaturePlan(question, glossary, unsupportedFeature), aiCalls: 0, provider: 'safety-guard' };
     if (!process.env.GEMINI_API_KEY) return { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic' };
     try {
       const geminiPlan = await this.#gemini(question, semanticMap);

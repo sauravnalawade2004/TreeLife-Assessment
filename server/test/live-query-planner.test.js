@@ -108,6 +108,23 @@ test('does not narrow generic deal questions to a tenant-specific topic', () => 
   assert.equal(explicit.topic, 'gst_filing');
 });
 
+test('fails safely for unsupported negation and ranking questions', async () => {
+  const service = new (await import('../src/services/ai/live-query-planner.service.js')).LiveQueryPlannerService();
+  const questions = [
+    ['organizations without any open deals', 'negation'],
+    ['deals not owned by garima', 'negation'],
+    ['who owns the most deals', 'ranking']
+  ];
+  for (const [question, unsupportedFeature] of questions) {
+    const result = await service.plan(question, { glossary });
+    assert.equal(result.provider, 'safety-guard');
+    assert.equal(result.plan.requiresClarification, true);
+    assert.equal(result.plan.unsupportedFeature, unsupportedFeature);
+    assert.equal(result.plan.person, null);
+    assert.equal(result.plan.state, null);
+  }
+});
+
 test('extracts explicit month and year ranges from plain language', async () => {
   const service = new (await import('../src/services/ai/live-query-planner.service.js')).LiveQueryPlannerService();
   const result = await service.plan('How many deals were open in July 2026?', { glossary: { topics: [], people: {}, clients: [] } });

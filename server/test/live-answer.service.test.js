@@ -113,3 +113,36 @@ test('status evidence follows the selected actual item without changing numeric 
     liveQueryPlannerService.plan = originals.plannerPlan;
   }
 });
+
+test('unsupported negation and ranking questions return clarification before execution', async () => {
+  const originals = {
+    businessFind: BusinessTruthModel.find,
+    mapFindOne: SemanticMapModel.findOne,
+    tenantFindOne: TenantModel.findOne,
+    geminiKey: process.env.GEMINI_API_KEY
+  };
+  delete process.env.GEMINI_API_KEY;
+  BusinessTruthModel.find = () => ({ lean: async () => [truth({ sources: ['pipedrive'] })] });
+  SemanticMapModel.findOne = () => ({ lean: async () => ({ tenantId: 'acme-law', version: 10, glossary: { topics: ['transaction_deals'], people: { 'Garima Sharma': ['Garima'] }, clients: [] } }) });
+  TenantModel.findOne = () => ({ lean: async () => ({ tenantId: 'acme-law', connectors: [{ id: 'pipedrive-acme', type: 'crm', name: 'Pipedrive', status: 'healthy' }] }) });
+  try {
+    const service = new LiveAnswerService();
+    for (const [question, feature] of [
+      ['organizations without any open deals', 'negation'],
+      ['deals not owned by garima', 'negation'],
+      ['who owns the most deals', 'ranking']
+    ]) {
+      const result = await service.answer('acme-law', question);
+      assert.equal(result.status, 'NEEDS_CLARIFICATION');
+      assert.equal(result.answer, null);
+      assert.equal(result.interpretation.unsupportedFeature, feature);
+      assert.deepEqual(result.evidence.matchedRecordIds, []);
+    }
+  } finally {
+    BusinessTruthModel.find = originals.businessFind;
+    SemanticMapModel.findOne = originals.mapFindOne;
+    TenantModel.findOne = originals.tenantFindOne;
+    if (originals.geminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originals.geminiKey;
+  }
+});
