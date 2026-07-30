@@ -492,7 +492,7 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
   if (truths.length) await BusinessTruthModel.insertMany(truths);
 
   const peopleEntries = ownerIndex.explicit.map((person) => {
-    const cleanPersonName = String(person || '').replace(/\s*(?:ARN:|Status:.*|for.*|reference.*|token.*|case.*)\s*$/i, '').replace(/\s+[A-Z0-9]+[A-Z0-9-]*$|^\s*(?:[A-Z][a-z]+\s+){1,}(?:ARN|Status|Reference|Token)[a-z]*\s*$/, '').replace(/^(?:.,?\s*)?(Synthetic|assessment|evidence|document|--|of|1|all\s+of\s+\d+|GST|ID|A/N)\s+/, '').trim();
+    const cleanPersonName = String(person || '').replace(/\s*(?:ARN:|Status:.*|for.*|reference.*|token.*|case.*)\s*$/i, '').replace(/\s+[A-Z0-9]+[A-Z0-9-]*$|^\s*(?:[A-Z][a-z]+\s+){1,}(?:ARN|Status|Reference|Token)[a-z]*\s*$/, '').replace(/^(?:.,?\s*)?(Synthetic|assessment|evidence|document|--|of|1|all\s+of\s+\d+|GST|ID|A\/N)\s+/, '').trim();
     const ownerAliases = distinct(truths.filter((truth) => truth.owners.includes(person)).flatMap((truth) => truth.ownerAliases)).map(n => String(n).replace(/\s*(?:ARN:|Status:.*|for.*|reference.*|token.*|case.*)\s*$/i, '').replace(/\s+[A-Z0-9]+[A-Z0-9-]*$|^\s*(?:[A-Z][a-z]+\s+){1,}(?:ARN|Status|Reference|Token)[a-z]*\s*$/, '').replace(/^(?:.,?\s*)?(Synthetic|assessment|evidence|document|--|of|1|all\s+of\s+\d+|GST|ID|A\/N)\s+/, '').trim()).filter(n => n && n.length > 1 && /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$/.test(n));
     const uniquePeople = distinct([...ownerAliases, cleanPersonName].filter(Boolean));
     return [cleanPersonName, uniquePeople];
