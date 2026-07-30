@@ -168,7 +168,11 @@ export class LiveAnswerService {
     const negateClient = plan.negatedClient || (plan.negated && Boolean(plan.client) && !plan.requireNoMatchingInGroup);
     const negateState = plan.negatedState || (plan.negated && Boolean(plan.state) && !plan.requireNoMatchingInGroup);
     const matchesPerson = (truth) => !plan.person || [...(truth.owners || []), ...(truth.ownerAliases || [])].some((owner) => fuzzyMatch(owner, plan.person));
-    const matchesState = (truth) => !plan.state || (negateState ? truth.state !== plan.state : truth.state === plan.state);
+    const matchesState = (truth) => {
+      if (plan.states && plan.states.length > 0) return plan.states.includes(truth.state);
+      if (!plan.state) return true;
+      return negateState ? truth.state !== plan.state : truth.state === plan.state;
+    };
     const scopedCandidates = candidates.filter((truth) => {
       // Group-level absence checks evaluate the target condition inside each
       // organization below, rather than filtering its records beforehand.
@@ -193,10 +197,14 @@ export class LiveAnswerService {
         .filter(plan.requireNoMatchingInGroup
           ? (group) => !group.some((truth) => {
             const personMatches = matchesPerson(truth);
-            const stateMatches = !plan.state || truth.state === plan.state;
+            const stateMatches = plan.states && plan.states.length > 0
+              ? plan.states.includes(truth.state)
+              : !plan.state || truth.state === plan.state;
             return personMatches && stateMatches;
           })
-          : () => true)
+          : plan.requireAllStatesInGroup && plan.states && plan.states.length > 0
+            ? (group) => plan.states.every((requiredState) => group.some((truth) => truth.state === requiredState))
+            : () => true)
         .map((group) => group[0])
       : scopedCandidates;
     const matched = plan.requireNoMatchingInGroup

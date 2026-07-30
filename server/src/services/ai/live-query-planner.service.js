@@ -16,6 +16,8 @@ const Plan = z.object({
   negatedState: z.boolean().default(false),
   groupByClient: z.boolean().default(false),
   requireNoMatchingInGroup: z.boolean().default(false),
+  requireAllStatesInGroup: z.boolean().default(false),
+  states: z.array(z.enum(['completed', 'open', 'cancelled', 'unknown'])).default([]),
   unsupportedFeature: z.enum(['negation', 'ranking']).nullable().default(null),
   supportedByTenant: z.boolean().default(true),
   requiresClarification: z.boolean().default(false),
@@ -179,6 +181,8 @@ function unsupportedFeaturePlan(question, glossary, feature) {
     negatedState: false,
     groupByClient: false,
     requireNoMatchingInGroup: false,
+    requireAllStatesInGroup: false,
+    states: [],
     unsupportedFeature: feature,
     requiresClarification: true,
     clarification: `Questions requiring ${description} are not supported yet. Please rephrase without that constraint.`
@@ -239,6 +243,14 @@ function fallbackPlan(question, glossary = {}) {
   const negationActive = /(?:^|\s)(?:not|without|excluding|except|never|nobody|none|besides|zero)\b|\bno\s|isn'?t|aren'?t|don'?t|doesn'?t|won'?t|wouldn'?t|shouldn'?t|couldn'?t|hasn'?t|haven'?t|hadn'?t|wasn'?t|weren'?t\b|\bother\s+than\b|\bapart\s+from\b/.test(q);
   const negateWhat = negationActive ? q.match(/\b(?:excluding|except|without|besides|not\s+by|everyone\w*\s+except|other\s+than|apart\s+from|ko\s+chhodkar|ke\s+alawa)\s+(\S+)/i)?.[1]?.toLowerCase() : null;
   const groupAbsencePattern = negationActive && /organi[sz]ation|org\b|client/.test(q) && /\b(?:no\s|without|none|not\s+have|not\s+has|don'?t\s+have|zero)\b/.test(q) && state;
+  const bothStatesPattern = /\bboth\b/.test(q) || /\b(?:open|completed|cancelled)\b.*\b(?:and|&)\b.*\b(?:open|completed|cancelled)\b/.test(q);
+  const intersectionStates = [];
+  if (bothStatesPattern) {
+    if (/\bopen\b/.test(q)) intersectionStates.push('open');
+    if (/\bcomplete|filed|done|closed\b/.test(q)) intersectionStates.push('completed');
+    if (/\bcancel\b/.test(q)) intersectionStates.push('cancelled');
+  }
+  const requireAllStatesInGroup = intersectionStates.length >= 2 && /organi[sz]ation|org\b|client|which|list/i.test(q);
   return Plan.parse({
     operation,
     scope,
@@ -253,8 +265,10 @@ function fallbackPlan(question, glossary = {}) {
     negatedPerson: !!(negationActive && person && (negateWhat && normalize(negateWhat) === normalize(person.split(' ')[0]) || !negateWhat && !groupAbsencePattern)),
     negatedClient: false,
     negatedState: !!(negationActive && state && (groupAbsencePattern || !negateWhat)),
-    groupByClient: !!groupAbsencePattern,
+    groupByClient: !!groupAbsencePattern || requireAllStatesInGroup,
     requireNoMatchingInGroup: !!groupAbsencePattern,
+    requireAllStatesInGroup,
+    states: requireAllStatesInGroup ? intersectionStates : [],
     supportedByTenant: true,
     requiresClarification: false,
     clarification: null
@@ -279,6 +293,9 @@ export class LiveQueryPlannerService {
     const guardedGemini = finalizePlan(question, geminiPlan, glossary);
     const fallback = finalizePlan(question, fallbackPlan(question, glossary), glossary);
     if (guardedGemini.requiresClarification) return { plan: guardedGemini, aiCalls: 1, provider: 'gemini' };
+    if (hasRankingKeyword(question) && !guardedGemini.unsupportedFeature) {
+      return { plan: unsupportedFeaturePlan(question, glossary, 'ranking'), aiCalls: 1, provider: 'gemini' };
+    }
     const genericCrm = crmTermRegex.test(question.toLowerCase()) && ['crm_deals','business_items'].includes(fallback.scope);
     const explicitListRequest = /\b(which|list|show|dikhao|where|where are|where is)\b/.test(question.toLowerCase());
     if (genericCrm && fallback.operation === 'count' && guardedGemini.operation !== 'count' && !explicitListRequest) {
@@ -307,12 +324,12 @@ Allowed scope: crm_deals,filings,files,business_items.
 Allowed state: completed,open,cancelled,unknown or null.
 Allowed timeRange: all,last_month,this_month,this_year,last_year,YYYY,YYYY-MM.
 Only set topic when the question explicitly names a subject/category, such as GST, contract, or income tax. Generic CRM nouns such as deal(s), lead(s), opportunity, or pipeline define scope only: use scope=crm_deals and topic=null for them. Use expandedTerms for synonyms and abbreviations. "Filed/filled/done/submitted" means completed. "Open/pending/chal raha" means open.
-Understand negation and exclusion semantically in any language or phrasing; do not rely on individual words. For an excluded owner, set person to the excluded person, negated=true, and negatedPerson=true. Apply the same field-level convention for topic, client, and state using negatedTopic, negatedClient, and negatedState. For organization/client requests meaning "no member has this condition" (for example, organizations with zero open deals), set groupByClient=true and requireNoMatchingInGroup=true; retain the target state/person as a positive condition to test inside each group, rather than applying it as a record filter. Do not set requiresClarification merely because negation is present: encode the requested inversion. If meaning is genuinely unclear, set requiresClarification=true instead of guessing.
+Understand negation and exclusion semantically in any language or phrasing; do not rely on individual words. For an excluded owner, set person to the excluded person, negated=true, and negatedPerson=true. Apply the same field-level convention for topic, client, and state using negatedTopic, negatedClient, and negatedState. For organization/client requests meaning "no member has this condition" (for example, organizations with zero open deals), set groupByClient=true and requireNoMatchingInGroup=true; retain the target state/person as a positive condition to test inside each group, rather than applying it as a record filter. For intersection queries requiring groups to contain records matching multiple states (for example, "organizations with both open and completed deals"), set groupByClient=true, requireAllStatesInGroup=true, and states to the list of required states (e.g., ["open","completed"]). Do not set requiresClarification merely because negation is present: encode the requested inversion. If meaning is genuinely unclear, set requiresClarification=true instead of guessing.
 If a term is genuinely ambiguous (for example closed could include completed and cancelled), set requiresClarification and provide one short clarification. Do not invent a client or person.
 Set supportedByTenant=false and requiresClarification=true when the question is unrelated to the connected business data or its subject cannot be mapped to the tenant glossary. Never map an unrelated general-knowledge question to business_items.
 Tenant glossary: ${JSON.stringify({ topics: glossary.topics || [], people: glossary.people || {}, clients: glossary.clients || [] })}
 Question: ${JSON.stringify(question)}
-Return fields: operation,scope,topic,person,client,state,timeRange,expandedTerms,negated,negatedTopic,negatedPerson,negatedClient,negatedState,groupByClient,requireNoMatchingInGroup,supportedByTenant,requiresClarification,clarification.`;
+Return fields: operation,scope,topic,person,client,state,timeRange,expandedTerms,negated,negatedTopic,negatedPerson,negatedClient,negatedState,groupByClient,requireNoMatchingInGroup,requireAllStatesInGroup,states,supportedByTenant,requiresClarification,clarification.`;
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

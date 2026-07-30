@@ -192,6 +192,14 @@ test('executes Gemini-provided negated filters and organization absence groups',
       assert.equal(result.status, 'ANSWERED');
       assert.equal(result.answer.value, 2);
     }
+
+    plan = { ...basePlan, operation: 'list', scope: 'crm_deals', topic: null, person: null, client: null, state: null, groupByClient: true, requireAllStatesInGroup: true, states: ['open', 'completed'] };
+    for (const question of ['which organizations have both open and completed deals', 'organizations with open and completed deals']) {
+      const result = await service.answer('acme-law', question);
+      assert.equal(result.status, 'ANSWERED');
+      assert.equal(result.answer.value.length, 1);
+      assert.equal(result.answer.value[0].client, 'Aster');
+    }
   } finally {
     BusinessTruthModel.find = originals.businessFind;
     SemanticMapModel.findOne = originals.mapFindOne;
