@@ -158,11 +158,8 @@ function removeImplicitGenericCrmTopic(question, plan) {
   return { ...plan, topic: null, expandedTerms: [] };
 }
 
-function unsupportedFeatureInQuestion(question) {
-  const q = normalizeQuestionText(question);
-  if (/\b(?:not|without|excluding|except)\b/.test(q)) return 'negation';
-  if (/\b(?:most|least|highest|top)\b/.test(q)) return 'ranking';
-  return null;
+function hasRankingKeyword(question) {
+  return /\b(?:most|least|highest|top)\b/.test(normalizeQuestionText(question));
 }
 
 function unsupportedFeaturePlan(question, glossary, feature) {
@@ -239,6 +236,9 @@ function fallbackPlan(question, glossary = {}) {
   }))?.[0] || people.find(([candidate]) => normalizedQuestion.includes(normalize(candidate).slice(0, 5)))?.[0] || null;
   const clients = glossary.clients || [];
   const client = clients.find((candidate) => normalize(q).includes(normalize(candidate))) || null;
+  const negationActive = /(?:^|\s)(?:not|without|excluding|except|never|nobody|none|besides|zero)\b|\bno\s|isn'?t|aren'?t|don'?t|doesn'?t|won'?t|wouldn'?t|shouldn'?t|couldn'?t|hasn'?t|haven'?t|hadn'?t|wasn'?t|weren'?t\b|\bother\s+than\b|\bapart\s+from\b/.test(q);
+  const negateWhat = negationActive ? q.match(/\b(?:excluding|except|without|besides|not\s+by|everyone\w*\s+except|other\s+than|apart\s+from|ko\s+chhodkar|ke\s+alawa)\s+(\S+)/i)?.[1]?.toLowerCase() : null;
+  const groupAbsencePattern = negationActive && /organi[sz]ation|org\b|client/.test(q) && /\b(?:no\s|without|none|not\s+have|not\s+has|don'?t\s+have|zero)\b/.test(q) && state;
   return Plan.parse({
     operation,
     scope,
@@ -248,13 +248,13 @@ function fallbackPlan(question, glossary = {}) {
     state,
     timeRange: extractTimeRange(q),
     expandedTerms: topic ? [topic, topic.replaceAll('_', ' ')] : [],
-    negated: false,
+    negated: !!negationActive,
     negatedTopic: false,
-    negatedPerson: false,
+    negatedPerson: !!(negationActive && person && (negateWhat && normalize(negateWhat) === normalize(person.split(' ')[0]) || !negateWhat && !groupAbsencePattern)),
     negatedClient: false,
-    negatedState: false,
-    groupByClient: false,
-    requireNoMatchingInGroup: false,
+    negatedState: !!(negationActive && state && (groupAbsencePattern || !negateWhat)),
+    groupByClient: !!groupAbsencePattern,
+    requireNoMatchingInGroup: !!groupAbsencePattern,
     supportedByTenant: true,
     requiresClarification: false,
     clarification: null
@@ -269,9 +269,9 @@ export class LiveQueryPlannerService {
   async plan(question, semanticMap) {
     const glossary = semanticMap?.glossary || {};
     if (!process.env.GEMINI_API_KEY) {
-      const unsupportedFeature = unsupportedFeatureInQuestion(question);
-      return unsupportedFeature
-        ? { plan: unsupportedFeaturePlan(question, glossary, unsupportedFeature), aiCalls: 0, provider: 'safety-guard' }
+      const ranking = hasRankingKeyword(question);
+      return ranking
+        ? { plan: unsupportedFeaturePlan(question, glossary, 'ranking'), aiCalls: 0, provider: 'safety-guard' }
         : { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic' };
     }
     try {
@@ -289,9 +289,9 @@ export class LiveQueryPlannerService {
     }
     return { plan: guardedGemini, aiCalls: 1, provider: 'gemini' };
     } catch {
-      const unsupportedFeature = unsupportedFeatureInQuestion(question);
-      return unsupportedFeature
-        ? { plan: unsupportedFeaturePlan(question, glossary, unsupportedFeature), aiCalls: 0, provider: 'safety-guard' }
+      const ranking = hasRankingKeyword(question);
+      return ranking
+        ? { plan: unsupportedFeaturePlan(question, glossary, 'ranking'), aiCalls: 0, provider: 'safety-guard' }
         : { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic-fallback' };
     }
   }

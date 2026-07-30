@@ -127,17 +127,21 @@ test('unsupported negation and ranking questions return clarification before exe
   TenantModel.findOne = () => ({ lean: async () => ({ tenantId: 'acme-law', connectors: [{ id: 'pipedrive-acme', type: 'crm', name: 'Pipedrive', status: 'healthy' }] }) });
   try {
     const service = new LiveAnswerService();
-    for (const [question, feature] of [
-      ['organizations without any open deals', 'negation'],
-      ['deals not owned by garima', 'negation'],
-      ['who owns the most deals', 'ranking']
-    ]) {
+    const negationCases = [
+      ['organizations without any open deals', 'VERIFIED_ZERO', 0],
+      ['deals not owned by garima', 'ANSWERED', 1]
+    ];
+    for (const [question, expectedStatus, expectedCount] of negationCases) {
       const result = await service.answer('acme-law', question);
-      assert.equal(result.status, 'NEEDS_CLARIFICATION');
-      assert.equal(result.answer, null);
-      assert.equal(result.interpretation.unsupportedFeature, feature);
-      assert.deepEqual(result.evidence.matchedRecordIds, []);
+      assert.equal(result.status, expectedStatus);
+      assert.notEqual(result.answer, null);
+      assert.equal(result.answer.value, expectedCount);
     }
+    const rankingResult = await service.answer('acme-law', 'who owns the most deals');
+    assert.equal(rankingResult.status, 'NEEDS_CLARIFICATION');
+    assert.equal(rankingResult.answer, null);
+    assert.equal(rankingResult.interpretation.unsupportedFeature, 'ranking');
+    assert.deepEqual(rankingResult.evidence.matchedRecordIds, []);
   } finally {
     BusinessTruthModel.find = originals.businessFind;
     SemanticMapModel.findOne = originals.mapFindOne;
