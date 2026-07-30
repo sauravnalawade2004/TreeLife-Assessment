@@ -491,9 +491,13 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
   if (facts.length) await SemanticFactModel.insertMany(facts);
   if (truths.length) await BusinessTruthModel.insertMany(truths);
 
+  const peopleEntries = ownerIndex.explicit.map((person) => {
+    const ownerAliases = distinct(truths.filter((truth) => truth.owners.includes(person)).flatMap((truth) => truth.ownerAliases));
+    return [person, distinct([...ownerAliases, person])];
+  });
   const glossary = {
     topics: distinct(truths.map((truth) => truth.topic)),
-    people: Object.fromEntries(ownerIndex.explicit.map((person) => [person, distinct(truths.filter((truth) => truth.owners.includes(person)).flatMap((truth) => truth.ownerAliases))])),
+    people: Object.fromEntries(peopleEntries),
     clients: distinct(truths.map((truth) => truth.client))
   };
   const sourceProfiles = {
