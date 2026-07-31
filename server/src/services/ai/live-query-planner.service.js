@@ -256,6 +256,8 @@ function fallbackPlan(question, glossary = {}) {
   const isRanking = /\b(?:most|least|highest|top|lowest|fewest|best|worst)\b/.test(q);
   const rankByOwner = isRanking && /\b(?:owner|who|person|handler|assignee|contact)\b/.test(q) && !/\b(?:client|organization|company|business|account)\b/.test(q);
   const rankByClient = isRanking && !rankByOwner;
+  const asksAboutOrganizations = /\b(?:organi[sz]ation|org|orgs|client|clients|customer|customers|company|companies|business|businesses|account|accounts)\b/.test(q);
+  const groupByClientForOrgs = asksAboutOrganizations && !client && !person && !negationActive && !requireAllStatesInGroup && !rankByOwner;
   return Plan.parse({
     operation,
     scope,
@@ -270,7 +272,7 @@ function fallbackPlan(question, glossary = {}) {
     negatedPerson: !!(negationActive && person && (negateWhat && normalize(negateWhat) === normalize(person.split(' ')[0]) || !negateWhat && !groupAbsencePattern)),
     negatedClient: false,
     negatedState: !!(negationActive && state && (groupAbsencePattern || !negateWhat)),
-    groupByClient: !!groupAbsencePattern || requireAllStatesInGroup || rankByClient,
+    groupByClient: !!groupAbsencePattern || requireAllStatesInGroup || rankByClient || groupByClientForOrgs,
     groupByOwner: !!rankByOwner,
     requireNoMatchingInGroup: !!groupAbsencePattern,
     requireAllStatesInGroup,
