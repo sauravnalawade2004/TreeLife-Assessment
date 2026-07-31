@@ -162,7 +162,7 @@ function removeImplicitGenericCrmTopic(question, plan) {
 }
 
 function hasRankingKeyword(question) {
-  return /\b(?:most|least|highest|top)\b/.test(normalizeQuestionText(question));
+  return /\b(?:most|least|highest|top|lowest|fewest|best|worst|more|fewer|less|better|worse)\b/.test(normalizeQuestionText(question));
 }
 
 function unsupportedFeaturePlan(question, glossary, feature) {
@@ -253,7 +253,7 @@ function fallbackPlan(question, glossary = {}) {
     if (/\bcancel\b/.test(q)) intersectionStates.push('cancelled');
   }
   const requireAllStatesInGroup = intersectionStates.length >= 2 && /organi[sz]ation|org\b|client|which|list/i.test(q);
-  const isRanking = /\b(?:most|least|highest|top|lowest|fewest|best|worst)\b/.test(q);
+  const isRanking = /\b(?:most|least|highest|top|lowest|fewest|best|worst|more|fewer|less|better|worse)\b/.test(q);
   const rankByOwner = isRanking && /\b(?:owner|who|person|handler|assignee|contact)\b/.test(q) && !/\b(?:client|organization|company|business|account)\b/.test(q);
   const rankByClient = isRanking && !rankByOwner;
   const asksAboutOrganizations = /\b(?:organi[sz]ations?|org|orgs|client|clients|customer|customers|company|companies|business|businesses|account|accounts)\b/.test(q);

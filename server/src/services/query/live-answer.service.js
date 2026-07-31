@@ -10,7 +10,7 @@ const crmTermRegex = new RegExp(`\\b(?:${crmEntityTerms.join('|')})\\b`);
 const filingTopic = (topic) => /filing|return|application/.test(topic || '');
 const liveConnectorIds = new Set(['pipedrive-acme', 'documents-acme', 'google-drive-acme', 'notion-acme']);
 function hasRankingKeyword(question) {
-  return /\b(?:most|least|highest|top|lowest|fewest|best|worst)\b/.test(String(question || '').toLowerCase());
+  return /\b(?:most|least|highest|top|lowest|fewest|best|worst|more|fewer|less|better|worse)\b/.test(String(question || '').toLowerCase());
 }
 
 function activeConnectors(connectors = []) {
@@ -220,7 +220,7 @@ export class LiveAnswerService {
     const countCandidates = broadCount ? truths.filter((truth) => truth.sources.includes('pipedrive') && inRange(truth, plan.timeRange)) : [];
     const allHealthy = sourceCoverage.filter((item) => item.status === 'checked').every((item) => ['healthy', 'demo'].includes(item.health));
     const isRanking = hasRankingKeyword(question);
-    const descending = /\b(?:most|highest|top|best)\b/.test(String(question || '').toLowerCase());
+    const descending = /\b(?:most|highest|top|best|more|better)\b/.test(String(question || '').toLowerCase());
     let status = 'ANSWERED', answer = null;
     let evidenceItems = matched.map((item) => item.representative);
     let selectedStatusItem = null;
