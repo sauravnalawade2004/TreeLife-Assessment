@@ -306,6 +306,9 @@ export class LiveQueryPlannerService {
     if (!guardedGemini.supportedByTenant && fallback.supportedByTenant) {
       return { plan: fallback, aiCalls: 1, provider: 'gemini' };
     }
+    if (fallback.groupByClient && !guardedGemini.groupByClient && !guardedGemini.groupByOwner && !guardedGemini.client && !guardedGemini.person) {
+      return { plan: { ...guardedGemini, groupByClient: true }, aiCalls: 1, provider: 'gemini' };
+    }
     return { plan: guardedGemini, aiCalls: 1, provider: 'gemini' };
     } catch {
       return { plan: finalizePlan(question, fallbackPlan(question, glossary), glossary), aiCalls: 0, provider: 'deterministic-fallback' };
