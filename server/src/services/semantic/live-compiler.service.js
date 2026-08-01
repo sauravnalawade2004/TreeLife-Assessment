@@ -471,7 +471,7 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
       sourceRecordId: bundle.sourceRecordId,
       objectType: fact.objectType,
       topic: normalize(fact.topic) ? fact.topic.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') : 'unknown',
-      client: fact.client,
+      client: fact.client || bundle.organization || null,
       ownerRaw: fact.ownerRaw,
       ownerCanonical: fact.ownerCanonical,
       lifecycleClaim: fact.lifecycleClaim,
