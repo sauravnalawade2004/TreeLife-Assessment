@@ -463,33 +463,6 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
   // The local folder mirrors Drive for offline development. Never compile both copies as independent evidence.
   const records = hasLiveDrive ? indexedRecords.filter((record) => record.source !== 'documents') : indexedRecords;
   const bundles = buildBundles(records);
-  const pipedriveDeals = records.filter((r) => r.source === 'pipedrive' && r.entity === 'deal');
-  const allRawKeys = new Set();
-  const allCfKeys = new Set();
-  for (const deal of pipedriveDeals) {
-    for (const key of Object.keys(deal.fields.raw || {})) allRawKeys.add(key);
-    for (const key of Object.keys(deal.fields.custom_fields || {})) allCfKeys.add(key);
-  }
-  const ownerLikeKeys = [...allRawKeys, ...allCfKeys].filter((k) => /user|person|assign|owner|employee|handler|team|rm|relationship|staff|member|lead|contact|account.?manager|advisor|partner|created.?by/i.test(k));
-  console.log('[COMPILE DEBUG] All raw fields:', [...allRawKeys].sort().join(', '));
-  console.log('[COMPILE DEBUG] All custom fields:', [...allCfKeys].sort().join(', '));
-  console.log('[COMPILE DEBUG] Owner-like fields:', ownerLikeKeys.join(', '));
-  const dealOwnerSamples = pipedriveDeals.slice(0, 30).map((d) => {
-    const cf = d.fields.custom_fields || {};
-    const raw = d.fields.raw || {};
-    return { title: (d.fields.title || '').slice(0, 40), dealOwner: cf['Deal Owner']?.value ?? cf['Deal Owner'] ?? null, leadOwner: cf['Lead Owner']?.value ?? cf['Lead Owner'] ?? null, oldEmployee: cf['Old Employee']?.value ?? cf['Old Employee'] ?? null, rawOwner: raw.owner_id, rawCreator: raw.creator_user_id };
-  });
-  console.log('[COMPILE DEBUG] Deal Owner samples:', JSON.stringify(dealOwnerSamples, null, 2));
-  const dealOwnerValues = pipedriveDeals.map((d) => d.fields.custom_fields?.['Deal Owner']?.value ?? d.fields.custom_fields?.['Deal Owner'] ?? null).filter(Boolean);
-  const uniqueDealOwners = [...new Set(dealOwnerValues.map(String))];
-  console.log('[COMPILE DEBUG] Unique Deal Owner values:', uniqueDealOwners.join(' | '));
-  console.log('[COMPILE DEBUG] Deals with Deal Owner:', dealOwnerValues.length, '/', pipedriveDeals.length);
-  const sampleDeal = pipedriveDeals[0];
-  if (sampleDeal) {
-    const raw = sampleDeal.fields.raw || {};
-    const ownerRelated = Object.entries(raw).filter(([k]) => /user|person|assign|owner|employee|handler|team|member|lead|created/i.test(k));
-    console.log('[COMPILE DEBUG] Sample deal owner-related raw fields:', JSON.stringify(Object.fromEntries(ownerRelated)));
-  }
   if (!bundles.length) throw Object.assign(new Error('No live source records are indexed'), { status: 422 });
   const extracted = await semanticAiService.extractFacts(bundles);
   const bundleById = new Map(bundles.map((bundle) => [bundle.inputId, bundle]));
@@ -536,13 +509,23 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
   const referenceField = roleField('reference', 0.7);
   const periodField = roleField('period', 0.7);
   console.log('[DEBUG] Field hypotheses:', JSON.stringify(fieldHypotheses, null, 2));
+  const PREFERRED_OWNER_FIELDS = ['Deal Owner', 'Old Employee', 'Lead Owner'];
   for (const fact of facts) {
     const custom = fact.rawEvidence?.customFields || {};
     const observed = (field) => {
       const match = Object.keys(custom).find((key) => key.toLowerCase() === String(field).toLowerCase());
       return match ? (custom[match]?.value ?? custom[match] ?? null) : null;
     };
-    if (ownerField && observed(ownerField)) fact.ownerRaw = String(observed(ownerField));
+    let ownerValue = null;
+    for (const preferred of PREFERRED_OWNER_FIELDS) {
+      const val = observed(preferred);
+      if (val && String(val).trim()) { ownerValue = String(val).trim(); break; }
+    }
+    if (!ownerValue && ownerField) {
+      const fallbackVal = observed(ownerField);
+      if (fallbackVal && !/^\d+$/.test(String(fallbackVal).trim())) ownerValue = String(fallbackVal).trim();
+    }
+    if (ownerValue) fact.ownerRaw = ownerValue;
     if (referenceField && observed(referenceField)) fact.reference = String(observed(referenceField));
     if (periodField && observed(periodField)) fact.period = String(observed(periodField));
     const evidenceText = `${fact.text || ''} ${(fact.rawEvidence?.notes || []).join(' ')} ${fact.rawEvidence?.title || ''}`.toLowerCase();
