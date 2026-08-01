@@ -131,6 +131,18 @@ function operations(tenantId, snapshot) {
       syncedAt
     });
   }
+  for (const user of (snapshot.users || [])) {
+    if (user.id && user.name) {
+      docs.push({
+        tenantId,
+        source: 'pipedrive',
+        entity: 'user',
+        recordId: `user:${user.id}`,
+        fields: { name: user.name, email: user.email || null, raw: user },
+        syncedAt
+      });
+    }
+  }
   return docs;
 }
 

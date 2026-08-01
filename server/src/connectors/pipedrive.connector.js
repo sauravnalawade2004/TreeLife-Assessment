@@ -107,12 +107,13 @@ export class PipedriveConnector {
   }
 
   async fetchSnapshot(config) {
-    const [me, dealFields, deals, organizations, notes] = await Promise.all([
+    const [me, dealFields, deals, organizations, notes, users] = await Promise.all([
       this.request('/api/v1/users/me', { config }),
       this.fetchV2Collection('/api/v2/dealFields', {}, config),
       this.fetchV2Collection('/api/v2/deals', { status: 'open,won,lost', include_fields: 'notes_count' }, config),
       this.fetchV2Collection('/api/v2/organizations', { include_fields: 'notes_count' }, config),
-      this.fetchV1Collection('/api/v1/notes', {}, config)
+      this.fetchV1Collection('/api/v1/notes', {}, config),
+      this.fetchV1Collection('/api/v1/users', {}, config).catch(() => [])
     ]);
     return {
       syncedAt: new Date().toISOString(),
@@ -120,7 +121,8 @@ export class PipedriveConnector {
       dealFields,
       deals,
       organizations,
-      notes
+      notes,
+      users: Array.isArray(users) ? users : []
     };
   }
 }

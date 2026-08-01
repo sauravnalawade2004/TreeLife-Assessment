@@ -159,6 +159,14 @@ function ownerSimilarity(alias, canonical) {
 function buildBundles(records) {
   const organizations = new Map(records.filter((record) => record.source === 'pipedrive' && record.entity === 'organization')
     .map((record) => [String(record.fields.raw?.id ?? record.id.replace('organization:', '')), record.fields.name]));
+  const usersById = new Map(records.filter((record) => record.source === 'pipedrive' && record.entity === 'user')
+    .map((record) => [String(record.fields.raw?.id ?? record.id.replace('user:', '')), record.fields.name]));
+  const resolveOwner = (value) => {
+    if (!value) return value;
+    const str = String(value).trim();
+    if (/^\d+$/.test(str) && usersById.has(str)) return usersById.get(str);
+    return str;
+  };
   const notesByDeal = new Map();
   for (const note of records.filter((record) => record.source === 'pipedrive' && record.entity === 'note')) {
     const dealId = String(note.fields.deal_id ?? '');
@@ -178,6 +186,11 @@ function buildBundles(records) {
         return { ...acc, [name]: { value: fieldValue } };
       }, {});
     const customFields = { ...rawFields, ...(deal.fields.custom_fields || {}) };
+    for (const [name, item] of Object.entries(customFields)) {
+      if (/owner|assignee|user|person|contact/i.test(name) && item?.value) {
+        customFields[name] = { ...item, value: resolveOwner(item.value) };
+      }
+    }
     const customText = Object.entries(customFields).map(([name, item]) => `${name}: ${item?.value ?? item}`).join('; ');
     const rawSummary = Object.entries(deal.fields.raw || {})
       .filter(([, value]) => value !== undefined && value !== null && value !== '')
