@@ -106,14 +106,9 @@ export class PipedriveConnector {
     return items;
   }
 
-  async fetchUsersFromDeals(deals, currentUser, config) {
-    const ownerIds = new Set();
-    for (const deal of deals) {
-      const ownerId = deal.owner_id || deal.user_id;
-      if (ownerId && ownerId !== currentUser?.id) ownerIds.add(String(ownerId));
-    }
+  async fetchMissingUsersByIds(missingIds, config) {
     const users = [];
-    for (const id of ownerIds) {
+    for (const id of missingIds) {
       try {
         const payload = await this.request(`/api/v1/users/${id}`, { config });
         if (payload.data) users.push(payload.data);
@@ -133,18 +128,42 @@ export class PipedriveConnector {
       this.fetchV2Collection('/api/v2/organizations', { include_fields: 'notes_count' }, config),
       this.fetchV1Collection('/api/v1/notes', {}, config)
     ]);
+
     let users = [];
     try {
       users = await this.fetchV1Collection('/api/v1/users', {}, config);
       console.log(`[Pipedrive] Fetched ${users.length} users from /api/v1/users`);
     } catch (err) {
-      console.warn(`[Pipedrive] /api/v1/users failed (${err.message}), fetching users from deals...`);
-      users = await this.fetchUsersFromDeals(deals, me.data, config);
-      console.log(`[Pipedrive] Fetched ${users.length} users from deal owner_ids`);
+      console.warn(`[Pipedrive] /api/v1/users failed: ${err.message}`);
+      users = [];
     }
-    if (me.data?.id && !users.some((u) => u.id === me.data.id)) {
+
+    const knownUserIds = new Set([
+      me.data?.id,
+      ...users.map((u) => u.id)
+    ].filter(Boolean).map(String));
+
+    const dealOwnerIds = new Set();
+    for (const deal of deals) {
+      const ownerId = String(deal.owner_id || deal.user_id || '');
+      if (ownerId && ownerId !== '0' && !knownUserIds.has(ownerId)) {
+        dealOwnerIds.add(ownerId);
+      }
+    }
+
+    if (dealOwnerIds.size > 0) {
+      console.log(`[Pipedrive] Bulk users returned ${users.length} but deals reference ${dealOwnerIds.size} unknown owner_ids: [${[...dealOwnerIds].join(', ')}]. Fetching individually...`);
+      const missing = await this.fetchMissingUsersByIds([...dealOwnerIds], config);
+      users.push(...missing);
+      console.log(`[Pipedrive] Total users after individual fetch: ${users.length}`);
+    } else {
+      console.log(`[Pipedrive] All deal owner_ids covered by bulk users response`);
+    }
+
+    if (me.data?.id && !users.some((u) => String(u.id) === String(me.data.id))) {
       users.unshift(me.data);
     }
+
     return {
       syncedAt: new Date().toISOString(),
       currentUser: me.data,

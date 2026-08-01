@@ -463,6 +463,23 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
   // The local folder mirrors Drive for offline development. Never compile both copies as independent evidence.
   const records = hasLiveDrive ? indexedRecords.filter((record) => record.source !== 'documents') : indexedRecords;
   const bundles = buildBundles(records);
+  const pipedriveDeals = records.filter((r) => r.source === 'pipedrive' && r.entity === 'deal');
+  const allRawKeys = new Set();
+  const allCfKeys = new Set();
+  for (const deal of pipedriveDeals) {
+    for (const key of Object.keys(deal.fields.raw || {})) allRawKeys.add(key);
+    for (const key of Object.keys(deal.fields.custom_fields || {})) allCfKeys.add(key);
+  }
+  const ownerLikeKeys = [...allRawKeys, ...allCfKeys].filter((k) => /user|person|assign|owner|employee|handler|team|rm|relationship|staff|member|lead|contact|account.?manager|advisor|partner|created.?by/i.test(k));
+  console.log('[COMPILE DEBUG] All raw fields:', [...allRawKeys].sort().join(', '));
+  console.log('[COMPILE DEBUG] All custom fields:', [...allCfKeys].sort().join(', '));
+  console.log('[COMPILE DEBUG] Owner-like fields:', ownerLikeKeys.join(', '));
+  const sampleDeal = pipedriveDeals[0];
+  if (sampleDeal) {
+    const raw = sampleDeal.fields.raw || {};
+    const ownerRelated = Object.entries(raw).filter(([k]) => /user|person|assign|owner|employee|handler|team|member|lead|created/i.test(k));
+    console.log('[COMPILE DEBUG] Sample deal owner-related raw fields:', JSON.stringify(Object.fromEntries(ownerRelated)));
+  }
   if (!bundles.length) throw Object.assign(new Error('No live source records are indexed'), { status: 422 });
   const extracted = await semanticAiService.extractFacts(bundles);
   const bundleById = new Map(bundles.map((bundle) => [bundle.inputId, bundle]));
