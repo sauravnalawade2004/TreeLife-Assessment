@@ -474,6 +474,16 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
   console.log('[COMPILE DEBUG] All raw fields:', [...allRawKeys].sort().join(', '));
   console.log('[COMPILE DEBUG] All custom fields:', [...allCfKeys].sort().join(', '));
   console.log('[COMPILE DEBUG] Owner-like fields:', ownerLikeKeys.join(', '));
+  const dealOwnerSamples = pipedriveDeals.slice(0, 30).map((d) => {
+    const cf = d.fields.custom_fields || {};
+    const raw = d.fields.raw || {};
+    return { title: (d.fields.title || '').slice(0, 40), dealOwner: cf['Deal Owner']?.value ?? cf['Deal Owner'] ?? null, leadOwner: cf['Lead Owner']?.value ?? cf['Lead Owner'] ?? null, oldEmployee: cf['Old Employee']?.value ?? cf['Old Employee'] ?? null, rawOwner: raw.owner_id, rawCreator: raw.creator_user_id };
+  });
+  console.log('[COMPILE DEBUG] Deal Owner samples:', JSON.stringify(dealOwnerSamples, null, 2));
+  const dealOwnerValues = pipedriveDeals.map((d) => d.fields.custom_fields?.['Deal Owner']?.value ?? d.fields.custom_fields?.['Deal Owner'] ?? null).filter(Boolean);
+  const uniqueDealOwners = [...new Set(dealOwnerValues.map(String))];
+  console.log('[COMPILE DEBUG] Unique Deal Owner values:', uniqueDealOwners.join(' | '));
+  console.log('[COMPILE DEBUG] Deals with Deal Owner:', dealOwnerValues.length, '/', pipedriveDeals.length);
   const sampleDeal = pipedriveDeals[0];
   if (sampleDeal) {
     const raw = sampleDeal.fields.raw || {};
