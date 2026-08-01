@@ -106,15 +106,45 @@ export class PipedriveConnector {
     return items;
   }
 
+  async fetchUsersFromDeals(deals, currentUser, config) {
+    const ownerIds = new Set();
+    for (const deal of deals) {
+      const ownerId = deal.owner_id || deal.user_id;
+      if (ownerId && ownerId !== currentUser?.id) ownerIds.add(String(ownerId));
+    }
+    const users = [];
+    for (const id of ownerIds) {
+      try {
+        const payload = await this.request(`/api/v1/users/${id}`, { config });
+        if (payload.data) users.push(payload.data);
+      } catch {
+        console.warn(`[Pipedrive] Could not fetch user ${id}: creating placeholder`);
+        users.push({ id: Number(id), name: `User ${id}` });
+      }
+    }
+    return users;
+  }
+
   async fetchSnapshot(config) {
-    const [me, dealFields, deals, organizations, notes, users] = await Promise.all([
+    const [me, dealFields, deals, organizations, notes] = await Promise.all([
       this.request('/api/v1/users/me', { config }),
       this.fetchV2Collection('/api/v2/dealFields', {}, config),
       this.fetchV2Collection('/api/v2/deals', { status: 'open,won,lost', include_fields: 'notes_count' }, config),
       this.fetchV2Collection('/api/v2/organizations', { include_fields: 'notes_count' }, config),
-      this.fetchV1Collection('/api/v1/notes', {}, config),
-      this.fetchV1Collection('/api/v1/users', {}, config).catch(() => [])
+      this.fetchV1Collection('/api/v1/notes', {}, config)
     ]);
+    let users = [];
+    try {
+      users = await this.fetchV1Collection('/api/v1/users', {}, config);
+      console.log(`[Pipedrive] Fetched ${users.length} users from /api/v1/users`);
+    } catch (err) {
+      console.warn(`[Pipedrive] /api/v1/users failed (${err.message}), fetching users from deals...`);
+      users = await this.fetchUsersFromDeals(deals, me.data, config);
+      console.log(`[Pipedrive] Fetched ${users.length} users from deal owner_ids`);
+    }
+    if (me.data?.id && !users.some((u) => u.id === me.data.id)) {
+      users.unshift(me.data);
+    }
     return {
       syncedAt: new Date().toISOString(),
       currentUser: me.data,
