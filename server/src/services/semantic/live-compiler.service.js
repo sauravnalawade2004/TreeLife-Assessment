@@ -314,12 +314,6 @@ function canonicalOwners(groups) {
   }
   const explicit = distinct([...canonicalMap.values()]);
   const aliasMap = new Map();
-  for (const group of groups) {
-    const localCanonical = group.map((fact) => fact.ownerCanonical).find(Boolean);
-    const localRaw = group.map((fact) => fact.ownerRaw).filter(Boolean);
-    const canonical = canonicalMap.get(localCanonical) || localCanonical || localRaw[0];
-    if (canonical) localRaw.forEach((alias) => aliasMap.set(normalize(alias), canonical));
-  }
   for (const [name, canonical] of canonicalMap) aliasMap.set(normalize(name), canonical);
   return { explicit, aliasMap };
 }
@@ -525,7 +519,7 @@ export async function compileLiveSemanticLayer(tenantId = 'acme-law') {
       const fallbackVal = observed(ownerField);
       if (fallbackVal && !/^\d+$/.test(String(fallbackVal).trim())) ownerValue = String(fallbackVal).trim();
     }
-    if (ownerValue) fact.ownerRaw = ownerValue;
+    if (ownerValue) { fact.ownerRaw = ownerValue; fact.ownerCanonical = ownerValue; }
     if (referenceField && observed(referenceField)) fact.reference = String(observed(referenceField));
     if (periodField && observed(periodField)) fact.period = String(observed(periodField));
     const evidenceText = `${fact.text || ''} ${(fact.rawEvidence?.notes || []).join(' ')} ${fact.rawEvidence?.title || ''}`.toLowerCase();
